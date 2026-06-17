@@ -152,14 +152,14 @@ export default function EstoquePage() {
       };
 
       if (editingItem) {
-        const { error } = await supabase.from("estoque").update(itemData).eq("id", editingItem.id);
+        const { error } = await (supabase.from("estoque") as any).update(itemData).eq("id", editingItem.id);
         if (error) {
           toast.error("Erro ao atualizar item", { description: error.message });
         } else {
           toast.success("Item atualizado!");
         }
       } else {
-        const { error } = await supabase.from("estoque").insert(itemData);
+        const { error } = await (supabase.from("estoque") as any).insert(itemData);
         if (error) {
           toast.error("Erro ao criar item", { description: error.message });
         } else {
@@ -194,7 +194,7 @@ export default function EstoquePage() {
       }
 
       // Insert movement
-      const { error: movError } = await supabase.from("estoque_movimentacoes").insert({
+      const { error: movError } = await (supabase.from("estoque_movimentacoes") as any).insert({
         estoque_id: selectedItem.id,
         tipo: movForm.tipo as "entrada" | "saida" | "ajuste",
         quantidade: qty,
@@ -219,7 +219,7 @@ export default function EstoquePage() {
         newQty = qty; // ajuste sets absolute value
       }
 
-      await supabase.from("estoque").update({ quantidade: Math.max(0, newQty) }).eq("id", selectedItem.id);
+      await (supabase.from("estoque") as any).update({ quantidade: Math.max(0, newQty) }).eq("id", selectedItem.id);
 
       toast.success("Movimentacao registrada!");
       setMovForm({ tipo: "entrada", quantidade: "", motivo: "" });
@@ -332,7 +332,7 @@ export default function EstoquePage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Select value={categoriaFilter} onValueChange={setCategoriaFilter}>
+        <Select value={categoriaFilter} onValueChange={(v: string | null) => setCategoriaFilter(v ?? "todas")}>
           <SelectTrigger className="w-48">
             <SelectValue placeholder="Categoria" />
           </SelectTrigger>
@@ -461,7 +461,7 @@ export default function EstoquePage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Categoria</Label>
-                <Select value={form.categoria} onValueChange={(v) => setForm({ ...form, categoria: v })}>
+                <Select value={form.categoria} onValueChange={(v: string | null) => setForm({ ...form, categoria: v ?? "" })}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
@@ -474,7 +474,7 @@ export default function EstoquePage() {
               </div>
               <div className="space-y-2">
                 <Label>Unidade</Label>
-                <Select value={form.unidade} onValueChange={(v) => setForm({ ...form, unidade: v })}>
+                <Select value={form.unidade} onValueChange={(v: string | null) => setForm({ ...form, unidade: v ?? "un" })}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
@@ -575,7 +575,7 @@ export default function EstoquePage() {
           <form onSubmit={handleMovimentacao} className="flex items-end gap-3 p-4 bg-muted/50 rounded-lg">
             <div className="space-y-1 flex-1">
               <Label className="text-xs">Tipo</Label>
-              <Select value={movForm.tipo} onValueChange={(v) => setMovForm({ ...movForm, tipo: v })}>
+              <Select value={movForm.tipo} onValueChange={(v: string | null) => setMovForm({ ...movForm, tipo: v ?? "entrada" })}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>

@@ -168,7 +168,7 @@ export default function VendedorContratosPage() {
       const numero = `CTR-${Date.now().toString(36).toUpperCase()}`;
       const titulo = newContrato.titulo || `${CONTRATO_TIPOS[newContrato.tipo as ContratoTipo]} - ${clientes.find((c) => c.id === newContrato.cliente_id)?.nome || ""}`;
 
-      const { error } = await supabase.from("contratos").insert({
+      const { error } = await (supabase.from("contratos") as any).insert({
         numero,
         tipo: newContrato.tipo as ContratoTipo,
         titulo,
@@ -203,8 +203,8 @@ export default function VendedorContratosPage() {
 
   async function handleSendContract(contratoId: string) {
     const supabase = createClient();
-    const { error } = await supabase
-      .from("contratos")
+    const { error } = await (supabase
+      .from("contratos") as any)
       .update({ status: "enviado" as ContratoStatus, data_envio: new Date().toISOString() })
       .eq("id", contratoId);
 
@@ -366,7 +366,7 @@ export default function VendedorContratosPage() {
           <form onSubmit={handleCreateContrato} className="space-y-4">
             <div className="space-y-2">
               <Label>Tipo de Contrato</Label>
-              <Select value={newContrato.tipo} onValueChange={(v) => setNewContrato({ ...newContrato, tipo: v, modelo_id: "" })}>
+              <Select value={newContrato.tipo} onValueChange={(v: string | null) => setNewContrato({ ...newContrato, tipo: v ?? "", modelo_id: "" })}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Selecione o tipo" />
                 </SelectTrigger>
@@ -380,7 +380,7 @@ export default function VendedorContratosPage() {
 
             <div className="space-y-2">
               <Label>Modelo de Contrato</Label>
-              <Select value={newContrato.modelo_id} onValueChange={(v) => setNewContrato({ ...newContrato, modelo_id: v })}>
+              <Select value={newContrato.modelo_id} onValueChange={(v: string | null) => setNewContrato({ ...newContrato, modelo_id: v ?? "" })}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Selecione um modelo (opcional)" />
                 </SelectTrigger>
@@ -394,7 +394,7 @@ export default function VendedorContratosPage() {
 
             <div className="space-y-2">
               <Label>Cliente</Label>
-              <Select value={newContrato.cliente_id} onValueChange={(v) => setNewContrato({ ...newContrato, cliente_id: v })}>
+              <Select value={newContrato.cliente_id} onValueChange={(v: string | null) => setNewContrato({ ...newContrato, cliente_id: v ?? "" })}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Selecione o cliente" />
                 </SelectTrigger>
@@ -408,7 +408,7 @@ export default function VendedorContratosPage() {
 
             <div className="space-y-2">
               <Label>Scooter (opcional)</Label>
-              <Select value={newContrato.scooter_id} onValueChange={(v) => setNewContrato({ ...newContrato, scooter_id: v })}>
+              <Select value={newContrato.scooter_id} onValueChange={(v: string | null) => setNewContrato({ ...newContrato, scooter_id: v ?? "" })}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Selecione a scooter" />
                 </SelectTrigger>

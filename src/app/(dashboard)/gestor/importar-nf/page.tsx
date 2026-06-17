@@ -200,8 +200,8 @@ export default function ImportarNFPage() {
       if (!user) return;
 
       // 1. Create or find cliente profile
-      const { data: existingCliente } = await supabase
-        .from("profiles")
+      const { data: existingCliente } = await (supabase
+        .from("profiles") as any)
         .select("id")
         .eq("cpf", cliente.cpf.replace(/\D/g, ""))
         .single();
@@ -209,9 +209,9 @@ export default function ImportarNFPage() {
       let clienteId: string;
 
       if (existingCliente) {
-        clienteId = existingCliente.id;
+        clienteId = (existingCliente as any).id;
         // Update existing
-        await supabase.from("profiles").update({
+        await (supabase.from("profiles") as any).update({
           nome: cliente.nome,
           telefone: cliente.telefone || null,
           email: cliente.email || null,
@@ -219,7 +219,7 @@ export default function ImportarNFPage() {
         }).eq("id", clienteId);
       } else {
         clienteId = crypto.randomUUID();
-        const { error: profileError } = await supabase.from("profiles").insert({
+        const { error: profileError } = await (supabase.from("profiles") as any).insert({
           id: clienteId,
           email: cliente.email || `${cliente.cpf.replace(/\D/g, "")}@placeholder.com`,
           nome: cliente.nome,
@@ -244,7 +244,7 @@ export default function ImportarNFPage() {
       // 2. Create scooter
       let scooterId: string | null = null;
       if (scooter.modelo || scooter.chassi) {
-        const { data: scooterData, error: scooterError } = await supabase.from("scooters").insert({
+        const { data: scooterData, error: scooterError } = await (supabase.from("scooters") as any).insert({
           modelo: scooter.modelo || "Nao informado",
           marca: scooter.marca || "Nao informado",
           cor: scooter.cor || null,
@@ -266,14 +266,14 @@ export default function ImportarNFPage() {
           setImporting(false);
           return;
         }
-        scooterId = scooterData.id;
+        scooterId = (scooterData as any).id;
 
         // 3. Create garantia (1 year)
         const dataInicio = venda.data_compra || new Date().toISOString().slice(0, 10);
         const dataFim = new Date(dataInicio);
         dataFim.setFullYear(dataFim.getFullYear() + 1);
 
-        await supabase.from("garantias").insert({
+        await (supabase.from("garantias") as any).insert({
           scooter_id: scooterId,
           cliente_id: clienteId,
           tipo: "fabrica",
@@ -288,7 +288,7 @@ export default function ImportarNFPage() {
 
       // 4. Create contrato de compra e venda
       const contratoNumero = `CTR-${Date.now().toString(36).toUpperCase()}`;
-      await supabase.from("contratos").insert({
+      await (supabase.from("contratos") as any).insert({
         numero: contratoNumero,
         tipo: "compra_venda" as const,
         titulo: `Compra e Venda - ${cliente.nome}`,
@@ -314,7 +314,7 @@ export default function ImportarNFPage() {
       });
 
       // 5. Create nota fiscal record
-      await supabase.from("notas_fiscais").insert({
+      await (supabase.from("notas_fiscais") as any).insert({
         numero: venda.numero_nf || `NF-${Date.now()}`,
         ordem_id: null,
         venda_id: null,

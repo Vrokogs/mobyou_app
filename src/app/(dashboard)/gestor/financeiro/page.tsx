@@ -161,7 +161,7 @@ export default function FinanceiroPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+          <Select value={selectedMonth} onValueChange={(v: string | null) => setSelectedMonth(v ?? "")}>
             <SelectTrigger className="w-36">
               <SelectValue />
             </SelectTrigger>
@@ -171,7 +171,7 @@ export default function FinanceiroPage() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={selectedYear} onValueChange={setSelectedYear}>
+          <Select value={selectedYear} onValueChange={(v: string | null) => setSelectedYear(v ?? "")}>
             <SelectTrigger className="w-24">
               <SelectValue />
             </SelectTrigger>

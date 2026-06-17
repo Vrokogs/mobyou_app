@@ -194,8 +194,8 @@ export default function VendedorImportarNFPage() {
       if (!user) return;
 
       // 1. Create or find cliente
-      const { data: existingCliente } = await supabase
-        .from("profiles")
+      const { data: existingCliente } = await (supabase
+        .from("profiles") as any)
         .select("id")
         .eq("cpf", cliente.cpf.replace(/\D/g, ""))
         .single();
@@ -203,8 +203,8 @@ export default function VendedorImportarNFPage() {
       let clienteId: string;
 
       if (existingCliente) {
-        clienteId = existingCliente.id;
-        await supabase.from("profiles").update({
+        clienteId = (existingCliente as any).id;
+        await (supabase.from("profiles") as any).update({
           nome: cliente.nome,
           telefone: cliente.telefone || null,
           email: cliente.email || null,
@@ -212,7 +212,7 @@ export default function VendedorImportarNFPage() {
         }).eq("id", clienteId);
       } else {
         clienteId = crypto.randomUUID();
-        const { error: profileError } = await supabase.from("profiles").insert({
+        const { error: profileError } = await (supabase.from("profiles") as any).insert({
           id: clienteId,
           email: cliente.email || `${cliente.cpf.replace(/\D/g, "")}@placeholder.com`,
           nome: cliente.nome,
@@ -237,7 +237,7 @@ export default function VendedorImportarNFPage() {
       // 2. Create scooter
       let scooterId: string | null = null;
       if (scooter.modelo || scooter.chassi) {
-        const { data: scooterData, error: scooterError } = await supabase.from("scooters").insert({
+        const { data: scooterData, error: scooterError } = await (supabase.from("scooters") as any).insert({
           modelo: scooter.modelo || "Nao informado",
           marca: scooter.marca || "Nao informado",
           cor: scooter.cor || null,
@@ -259,14 +259,14 @@ export default function VendedorImportarNFPage() {
           setImporting(false);
           return;
         }
-        scooterId = scooterData.id;
+        scooterId = (scooterData as any).id;
 
         // 3. Garantia
         const dataInicio = venda.data_compra || new Date().toISOString().slice(0, 10);
         const dataFim = new Date(dataInicio);
         dataFim.setFullYear(dataFim.getFullYear() + 1);
 
-        await supabase.from("garantias").insert({
+        await (supabase.from("garantias") as any).insert({
           scooter_id: scooterId,
           cliente_id: clienteId,
           tipo: "fabrica",
@@ -283,7 +283,7 @@ export default function VendedorImportarNFPage() {
       const vendaNumero = `VND-${Date.now().toString(36).toUpperCase()}`;
       const vendaValor = venda.valor ? parseFloat(venda.valor) : 0;
 
-      const { data: vendaData } = await supabase.from("vendas").insert({
+      const { data: vendaData } = await (supabase.from("vendas") as any).insert({
         numero: vendaNumero,
         cliente_id: clienteId,
         vendedor_id: user.id,
@@ -300,7 +300,7 @@ export default function VendedorImportarNFPage() {
 
       // 5. Contrato
       const contratoNumero = `CTR-${Date.now().toString(36).toUpperCase()}`;
-      await supabase.from("contratos").insert({
+      await (supabase.from("contratos") as any).insert({
         numero: contratoNumero,
         tipo: "compra_venda" as const,
         titulo: `Compra e Venda - ${cliente.nome}`,
@@ -315,7 +315,7 @@ export default function VendedorImportarNFPage() {
         cliente_id: clienteId,
         scooter_id: scooterId,
         ordem_id: null,
-        venda_id: vendaData?.id || null,
+        venda_id: (vendaData as any)?.id || null,
         status: "rascunho" as const,
         valor: vendaValor || null,
         data_envio: null,
@@ -326,10 +326,10 @@ export default function VendedorImportarNFPage() {
       });
 
       // 6. NF record
-      await supabase.from("notas_fiscais").insert({
+      await (supabase.from("notas_fiscais") as any).insert({
         numero: venda.numero_nf || `NF-${Date.now()}`,
         ordem_id: null,
-        venda_id: vendaData?.id || null,
+        venda_id: (vendaData as any)?.id || null,
         cliente_id: clienteId,
         tipo: "entrada",
         valor: vendaValor,

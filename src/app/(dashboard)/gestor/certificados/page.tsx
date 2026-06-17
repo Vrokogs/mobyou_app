@@ -96,8 +96,8 @@ export default function CertificadosPage() {
       // Create a contrato for the certificate if needed
       const contratoNumero = `CERT-${Date.now().toString(36).toUpperCase()}`;
 
-      const { data: contratoData, error: contratoError } = await supabase
-        .from("contratos")
+      const { data: contratoData, error: contratoError } = await (supabase
+        .from("contratos") as any)
         .insert({
           numero: contratoNumero,
           tipo: "garantia" as const,
@@ -136,7 +136,7 @@ export default function CertificadosPage() {
         new Uint8Array(
           await crypto.subtle.digest(
             "SHA-256",
-            new TextEncoder().encode(`${contratoData.id}-${Date.now()}-${ordem.numero}`)
+            new TextEncoder().encode(`${(contratoData as any).id}-${Date.now()}-${ordem.numero}`)
           )
         )
       ).map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -170,8 +170,8 @@ export default function CertificadosPage() {
         gerado_em: new Date().toISOString(),
       };
 
-      const { error } = await supabase.from("certificados").insert({
-        contrato_id: contratoData.id,
+      const { error } = await (supabase.from("certificados") as any).insert({
+        contrato_id: (contratoData as any).id,
         hash,
         qr_code_url: qrCodeUrl,
         pdf_url: null,
@@ -263,12 +263,7 @@ export default function CertificadosPage() {
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Gerar Certificado
-            </Button>
-          </DialogTrigger>
+          <DialogTrigger render={<Button><Plus className="mr-2 h-4 w-4" />Gerar Certificado</Button>} />
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Gerar Certificado de Servico</DialogTitle>
@@ -279,7 +274,7 @@ export default function CertificadosPage() {
             <form onSubmit={handleGenerate} className="space-y-4">
               <div className="space-y-2">
                 <Label>Ordem de Servico Finalizada</Label>
-                <Select value={selectedOrdem} onValueChange={setSelectedOrdem}>
+                <Select value={selectedOrdem} onValueChange={(v: string | null) => setSelectedOrdem(v ?? "")}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Selecione a OS" />
                   </SelectTrigger>
@@ -484,7 +479,7 @@ export default function CertificadosPage() {
                   </div>
                 </div>
 
-                {previewCert.dados.descricao && (
+                {!!(previewCert.dados.descricao) && (
                   <>
                     <Separator />
                     <div>

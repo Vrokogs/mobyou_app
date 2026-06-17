@@ -137,8 +137,8 @@ export default function ContratoDetailPage() {
       updates.data_assinatura = new Date().toISOString();
     }
 
-    const { error } = await supabase
-      .from("contratos")
+    const { error } = await (supabase
+      .from("contratos") as any)
       .update(updates)
       .eq("id", contrato.id);
 
@@ -157,8 +157,8 @@ export default function ContratoDetailPage() {
     setSaving(true);
     const supabase = createClient();
 
-    const { error } = await supabase
-      .from("contratos")
+    const { error } = await (supabase
+      .from("contratos") as any)
       .update({ status: "enviado" as ContratoStatus, data_envio: new Date().toISOString() })
       .eq("id", contrato.id);
 
@@ -463,7 +463,7 @@ export default function ContratoDetailPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <Select value={newStatus} onValueChange={setNewStatus}>
+            <Select value={newStatus} onValueChange={(v: string | null) => setNewStatus(v ?? "")}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Selecione o novo status" />
               </SelectTrigger>

@@ -210,7 +210,7 @@ export function SignaturePadComponent({ contratoId, onComplete }: SignaturePadPr
       }
 
       // Save signature record
-      const { error } = await supabase.from("assinaturas").insert({
+      const { error } = await (supabase.from("assinaturas") as any).insert({
         contrato_id: contratoId,
         signatario_id: user.id,
         tipo: "cliente" as const,
@@ -228,8 +228,8 @@ export function SignaturePadComponent({ contratoId, onComplete }: SignaturePadPr
       }
 
       // Update contract status to assinado
-      await supabase
-        .from("contratos")
+      await (supabase
+        .from("contratos") as any)
         .update({
           status: "assinado" as const,
           data_assinatura: new Date().toISOString(),

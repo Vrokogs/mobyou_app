@@ -42,10 +42,7 @@ interface OrdemDetail {
   id: string;
   numero: string;
   status: OrdemServicoStatus;
-  tipo: string;
-  prioridade: string;
-  descricao_problema: string | null;
-  km_entrada: number | null;
+  km_atual: number | null;
   observacoes: string | null;
   created_at: string;
   scooter_id: string;
@@ -64,7 +61,7 @@ interface FotoOrdem {
   id: string;
   tipo: string;
   url: string;
-  descricao: string | null;
+  storage_path: string | null;
   created_at: string;
 }
 
@@ -91,9 +88,10 @@ interface TimelineEvento {
   tipo: string;
   titulo: string;
   descricao: string | null;
-  dados: Record<string, unknown> | null;
+  foto_url: string | null;
+  video_url: string | null;
   created_at: string;
-  usuario: { nome: string } | null;
+  responsavel: { nome: string } | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -181,9 +179,9 @@ export default function TecnicoOrdemDetailPage() {
     const { data, error } = await supabase
       .from("ordens_servico")
       .select(
-        "id, numero, status, tipo, prioridade, descricao_problema, km_entrada, observacoes, created_at, scooter_id, " +
-        "cliente:profiles!ordens_servico_cliente_id_fkey(nome, telefone, email), " +
-        "scooter:scooters!ordens_servico_scooter_id_fkey(modelo, marca, chassi, placa, km_atual)"
+        "id, numero, status, km_atual, observacoes, created_at, scooter_id, " +
+        "cliente:profiles!cliente_id(nome, telefone, email), " +
+        "scooter:scooters!scooter_id(modelo, marca, chassi, placa, km_atual)"
       )
       .eq("id", orderId)
       .single();
@@ -193,7 +191,7 @@ export default function TecnicoOrdemDetailPage() {
       return;
     }
     setOrdem(data as unknown as OrdemDetail);
-    setKmValue(data.km_entrada?.toString() ?? "");
+    setKmValue(data.km_atual?.toString() ?? "");
   }, [orderId, supabase]);
 
   const loadCheckin = useCallback(async () => {
@@ -226,7 +224,7 @@ export default function TecnicoOrdemDetailPage() {
   const loadFotos = useCallback(async () => {
     const { data } = await supabase
       .from("fotos_ordem")
-      .select("id, tipo, url, descricao, created_at")
+      .select("id, tipo, url, storage_path, created_at")
       .eq("ordem_id", orderId)
       .order("created_at", { ascending: false });
 
@@ -257,7 +255,7 @@ export default function TecnicoOrdemDetailPage() {
   const loadTimeline = useCallback(async () => {
     const { data } = await supabase
       .from("timeline_eventos")
-      .select("id, tipo, titulo, descricao, dados, created_at, usuario:profiles!timeline_eventos_usuario_id_fkey(nome)")
+      .select("id, tipo, titulo, descricao, foto_url, video_url, created_at, responsavel:profiles!responsavel_id(nome)")
       .eq("ordem_id", orderId)
       .order("created_at", { ascending: false });
 
@@ -374,7 +372,7 @@ export default function TecnicoOrdemDetailPage() {
 
       const { error } = await supabase
         .from("ordens_servico")
-        .update({ km_entrada: km })
+        .update({ km_atual: km })
         .eq("id", orderId);
 
       if (error) throw error;
@@ -477,20 +475,13 @@ export default function TecnicoOrdemDetailPage() {
         if (error) throw error;
       }
 
-      // Add timeline event with all diagnosis metadata
-      const dados: Record<string, unknown> = {};
-      if (pecas.length > 0) dados.pecas_necessarias = pecas.filter((p) => p.nome.trim());
-      if (servicos.length > 0) dados.servicos_necessarios = servicos.filter((s) => s.descricao.trim());
-      if (tempoEstimado) dados.tempo_estimado = tempoEstimado;
-      if (obsDiagnostico) dados.observacoes = obsDiagnostico;
-
+      // Add timeline event for diagnosis
       await supabase.from("timeline_eventos").insert({
         ordem_id: orderId,
-        usuario_id: user.id,
+        responsavel_id: user.id,
         tipo: "diagnostico",
         titulo: diagnostico.id ? "Diagnostico atualizado" : "Diagnostico criado",
         descricao: diagnostico.descricao,
-        dados: Object.keys(dados).length > 0 ? dados : null,
       });
 
       setDiagnosticoExisting(true);
@@ -537,16 +528,13 @@ export default function TecnicoOrdemDetailPage() {
         }
       }
 
-      const dados: Record<string, unknown> = {};
-      if (fotoUrl) dados.foto_url = fotoUrl;
-
       await supabase.from("timeline_eventos").insert({
         ordem_id: orderId,
-        usuario_id: user.id,
+        responsavel_id: user.id,
         tipo: "progresso",
         titulo: newEventTitle,
         descricao: newEventDesc || null,
-        dados: Object.keys(dados).length > 0 ? dados : null,
+        foto_url: fotoUrl,
       });
 
       setNewEventTitle("");
@@ -585,18 +573,18 @@ export default function TecnicoOrdemDetailPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
-      const updateData: Record<string, unknown> = { status: transition.next };
+      const updatePayload: Record<string, unknown> = { status: transition.next };
 
       // Set relevant dates
       if (transition.next === "em_servico") {
-        updateData.data_entrada = new Date().toISOString();
+        updatePayload.data_recebimento = new Date().toISOString();
       } else if (transition.next === "finalizado") {
-        updateData.data_conclusao = new Date().toISOString();
+        updatePayload.data_finalizacao = new Date().toISOString();
       }
 
       const { error } = await supabase
         .from("ordens_servico")
-        .update(updateData)
+        .update(updatePayload)
         .eq("id", orderId);
 
       if (error) throw error;
@@ -605,14 +593,10 @@ export default function TecnicoOrdemDetailPage() {
       if (user) {
         await supabase.from("timeline_eventos").insert({
           ordem_id: orderId,
-          usuario_id: user.id,
+          responsavel_id: user.id,
           tipo: "status_change",
           titulo: `Status alterado para "${ORDER_STATUS_LABELS[transition.next] ?? transition.next}"`,
-          descricao: null,
-          dados: {
-            status_anterior: ordem.status,
-            status_novo: transition.next,
-          },
+          descricao: `De ${ordem.status} para ${transition.next}`,
         });
       }
 
@@ -739,19 +723,15 @@ export default function TecnicoOrdemDetailPage() {
               <span className="font-mono text-xs">{ordem.scooter?.chassi ?? "---"}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Placa</span>
-              <span>{ordem.scooter?.placa ?? "---"}</span>
+              <span className="text-muted-foreground">KM Entrada</span>
+              <span>{ordem.km_atual ?? "---"} km</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">KM Atual</span>
-              <span>{ordem.scooter?.km_atual ?? 0} km</span>
-            </div>
-            {ordem.descricao_problema && (
+            {ordem.observacoes && (
               <>
                 <Separator />
                 <div>
-                  <span className="text-muted-foreground">Problema relatado</span>
-                  <p className="mt-1">{ordem.descricao_problema}</p>
+                  <span className="text-muted-foreground">Observacoes</span>
+                  <p className="mt-1">{ordem.observacoes}</p>
                 </div>
               </>
             )}
@@ -782,9 +762,9 @@ export default function TecnicoOrdemDetailPage() {
               Registrar KM
             </Button>
           </div>
-          {ordem.km_entrada != null && (
+          {ordem.km_atual != null && (
             <p className="text-sm text-muted-foreground mt-2">
-              KM registrado: <strong>{ordem.km_entrada} km</strong>
+              KM registrado: <strong>{ordem.km_atual} km</strong>
             </p>
           )}
         </CardContent>
@@ -1216,8 +1196,6 @@ export default function TecnicoOrdemDetailPage() {
                             ? "bg-amber-500"
                             : "bg-primary";
 
-                        const fotoUrl = event.dados?.foto_url as string | undefined;
-
                         return (
                           <div key={event.id} className="relative pl-10">
                             <div
@@ -1233,12 +1211,12 @@ export default function TecnicoOrdemDetailPage() {
                               {event.descricao && (
                                 <p className="text-sm text-muted-foreground">{event.descricao}</p>
                               )}
-                              {event.usuario && (
-                                <p className="text-xs text-muted-foreground">por {event.usuario.nome}</p>
+                              {event.responsavel && (
+                                <p className="text-xs text-muted-foreground">por {event.responsavel.nome}</p>
                               )}
-                              {fotoUrl && (
+                              {event.foto_url && (
                                 <img
-                                  src={fotoUrl}
+                                  src={event.foto_url}
                                   alt="Foto do evento"
                                   className="mt-2 h-24 w-auto rounded-lg border object-cover"
                                 />

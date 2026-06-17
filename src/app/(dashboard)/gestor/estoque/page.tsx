@@ -28,7 +28,7 @@ const CATEGORIAS = [
 ];
 
 interface MovimentacaoWithUser extends EstoqueMovimentacao {
-  usuario?: { nome: string } | null;
+  responsavel?: { nome: string } | null;
 }
 
 export default function EstoquePage() {
@@ -42,7 +42,7 @@ export default function EstoquePage() {
   const [movimentacoes, setMovimentacoes] = useState<MovimentacaoWithUser[]>([]);
   const [movDialogOpen, setMovDialogOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<Estoque | null>(null);
-  const [movForm, setMovForm] = useState({ tipo: "entrada" as string, quantidade: "", motivo: "" });
+  const [movForm, setMovForm] = useState({ tipo: "entrada" as "entrada" | "saida" | "reserva", quantidade: "", motivo: "" });
 
   const [form, setForm] = useState({
     nome: "",
@@ -52,9 +52,8 @@ export default function EstoquePage() {
     quantidade: "0",
     quantidade_minima: "5",
     unidade: "un",
-    valor_unitario: "0",
-    localizacao: "",
-    fornecedor: "",
+    preco_custo: "0",
+    preco_venda: "0",
   });
 
   const loadItens = useCallback(async () => {
@@ -86,7 +85,7 @@ export default function EstoquePage() {
     const supabase = createClient();
     const { data } = await supabase
       .from("estoque_movimentacoes")
-      .select("*, usuario:profiles!usuario_id(nome)")
+      .select("*, responsavel:profiles!responsavel_id(nome)")
       .eq("estoque_id", itemId)
       .order("created_at", { ascending: false })
       .limit(50);
@@ -98,7 +97,7 @@ export default function EstoquePage() {
     setForm({
       nome: "", codigo: "", categoria: "", descricao: "",
       quantidade: "0", quantidade_minima: "5", unidade: "un",
-      valor_unitario: "0", localizacao: "", fornecedor: "",
+      preco_custo: "0", preco_venda: "0",
     });
     setDialogOpen(true);
   }
@@ -107,15 +106,14 @@ export default function EstoquePage() {
     setEditingItem(item);
     setForm({
       nome: item.nome,
-      codigo: item.codigo,
-      categoria: item.categoria,
+      codigo: item.codigo ?? "",
+      categoria: item.categoria ?? "",
       descricao: item.descricao || "",
       quantidade: String(item.quantidade),
       quantidade_minima: String(item.quantidade_minima),
-      unidade: item.unidade,
-      valor_unitario: String(item.valor_unitario),
-      localizacao: item.localizacao || "",
-      fornecedor: item.fornecedor || "",
+      unidade: item.unidade ?? "un",
+      preco_custo: String(item.preco_custo ?? 0),
+      preco_venda: String(item.preco_venda ?? 0),
     });
     setDialogOpen(true);
   }
@@ -144,11 +142,8 @@ export default function EstoquePage() {
         quantidade: parseInt(form.quantidade) || 0,
         quantidade_minima: parseInt(form.quantidade_minima) || 0,
         unidade: form.unidade,
-        valor_unitario: parseFloat(form.valor_unitario) || 0,
-        localizacao: form.localizacao || null,
-        fornecedor: form.fornecedor || null,
-        foto_url: null,
-        ativo: true,
+        preco_custo: parseFloat(form.preco_custo) || 0,
+        preco_venda: parseFloat(form.preco_venda) || 0,
       };
 
       if (editingItem) {
@@ -196,11 +191,11 @@ export default function EstoquePage() {
       // Insert movement
       const { error: movError } = await (supabase.from("estoque_movimentacoes") as any).insert({
         estoque_id: selectedItem.id,
-        tipo: movForm.tipo as "entrada" | "saida" | "ajuste",
+        tipo: movForm.tipo,
         quantidade: qty,
         motivo: movForm.motivo || null,
         ordem_id: null,
-        usuario_id: user.id,
+        responsavel_id: user.id,
       });
 
       if (movError) {
@@ -211,12 +206,10 @@ export default function EstoquePage() {
 
       // Update stock quantity
       let newQty = selectedItem.quantidade;
-      if (movForm.tipo === "entrada") {
-        newQty += qty;
-      } else if (movForm.tipo === "saida") {
+      if (movForm.tipo === "saida") {
         newQty -= qty;
       } else {
-        newQty = qty; // ajuste sets absolute value
+        newQty += qty;
       }
 
       await (supabase.from("estoque") as any).update({ quantidade: Math.max(0, newQty) }).eq("id", selectedItem.id);
@@ -302,7 +295,7 @@ export default function EstoquePage() {
               <div>
                 <p className="text-sm text-muted-foreground">Valor Total</p>
                 <p className="text-2xl font-bold">
-                  {formatCurrency(itens.reduce((acc, i) => acc + i.quantidade * i.valor_unitario, 0))}
+                  {formatCurrency(itens.reduce((acc, i) => acc + i.quantidade * (i.preco_custo ?? 0), 0))}
                 </p>
               </div>
               <ArrowUpDown className="h-8 w-8 text-muted-foreground" />
@@ -369,7 +362,7 @@ export default function EstoquePage() {
                   <TableHead>Min</TableHead>
                   <TableHead>Preco Custo</TableHead>
                   <TableHead>Preco Venda</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Situacao</TableHead>
                   <TableHead>Acoes</TableHead>
                 </TableRow>
               </TableHeader>
@@ -394,8 +387,8 @@ export default function EstoquePage() {
                         <span className="text-muted-foreground text-xs ml-1">{item.unidade}</span>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{item.quantidade_minima}</TableCell>
-                      <TableCell>{formatCurrency(item.valor_unitario)}</TableCell>
-                      <TableCell>{formatCurrency(item.valor_unitario * 1.4)}</TableCell>
+                      <TableCell>{item.preco_custo != null ? formatCurrency(item.preco_custo) : "---"}</TableCell>
+                      <TableCell>{item.preco_venda != null ? formatCurrency(item.preco_venda) : "---"}</TableCell>
                       <TableCell>
                         {isLow ? (
                           <Badge variant="destructive" className="bg-red-100 text-red-800 flex items-center gap-1 w-fit">
@@ -490,7 +483,7 @@ export default function EstoquePage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Quantidade</Label>
                 <Input
@@ -509,33 +502,27 @@ export default function EstoquePage() {
                   onChange={(e) => setForm({ ...form, quantidade_minima: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Valor Unitario</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={form.valor_unitario}
-                  onChange={(e) => setForm({ ...form, valor_unitario: e.target.value })}
-                />
-              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Localizacao</Label>
+                <Label>Preco Custo (R$)</Label>
                 <Input
-                  placeholder="Ex: Prateleira A3"
-                  value={form.localizacao}
-                  onChange={(e) => setForm({ ...form, localizacao: e.target.value })}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.preco_custo}
+                  onChange={(e) => setForm({ ...form, preco_custo: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Fornecedor</Label>
+                <Label>Preco Venda (R$)</Label>
                 <Input
-                  placeholder="Nome do fornecedor"
-                  value={form.fornecedor}
-                  onChange={(e) => setForm({ ...form, fornecedor: e.target.value })}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.preco_venda}
+                  onChange={(e) => setForm({ ...form, preco_venda: e.target.value })}
                 />
               </div>
             </div>
@@ -575,14 +562,14 @@ export default function EstoquePage() {
           <form onSubmit={handleMovimentacao} className="flex items-end gap-3 p-4 bg-muted/50 rounded-lg">
             <div className="space-y-1 flex-1">
               <Label className="text-xs">Tipo</Label>
-              <Select value={movForm.tipo} onValueChange={(v: string | null) => setMovForm({ ...movForm, tipo: v ?? "entrada" })}>
+              <Select value={movForm.tipo} onValueChange={(v: string | null) => setMovForm({ ...movForm, tipo: (v ?? "entrada") as "entrada" | "saida" | "reserva" })}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="entrada">Entrada</SelectItem>
                   <SelectItem value="saida">Saida</SelectItem>
-                  <SelectItem value="ajuste">Ajuste</SelectItem>
+                  <SelectItem value="reserva">Reserva</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -639,14 +626,14 @@ export default function EstoquePage() {
                             : "bg-blue-100 text-blue-800"
                         }
                       >
-                        {mov.tipo === "entrada" ? "Entrada" : mov.tipo === "saida" ? "Saida" : "Ajuste"}
+                        {mov.tipo === "entrada" ? "Entrada" : mov.tipo === "saida" ? "Saida" : "Reserva"}
                       </Badge>
                     </TableCell>
                     <TableCell className="font-bold">
                       {mov.tipo === "entrada" ? "+" : mov.tipo === "saida" ? "-" : ""}{mov.quantidade}
                     </TableCell>
                     <TableCell className="text-sm">{mov.motivo || "---"}</TableCell>
-                    <TableCell className="text-sm">{mov.usuario?.nome || "---"}</TableCell>
+                    <TableCell className="text-sm">{mov.responsavel?.nome || "---"}</TableCell>
                     <TableCell className="text-sm">{formatDate(mov.created_at)}</TableCell>
                   </TableRow>
                 ))}

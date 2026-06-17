@@ -373,11 +373,11 @@ export default function OrdemDetalhePage() {
       if (data) {
         for (const ev of data as any[]) {
           let userName: string | undefined;
-          if (ev.usuario_id) {
+          if (ev.responsavel_id) {
             const { data: profile } = await supabase
               .from("profiles")
               .select("nome")
-              .eq("id", ev.usuario_id)
+              .eq("id", ev.responsavel_id)
               .single();
             userName = (profile as any)?.nome;
           }
@@ -431,10 +431,10 @@ export default function OrdemDetalhePage() {
       };
 
       if (action.nextStatus === "recebido") {
-        updateData.data_entrada = new Date().toISOString();
+        updateData.data_recebimento = new Date().toISOString();
       }
       if (action.nextStatus === "finalizado") {
-        updateData.data_conclusao = new Date().toISOString();
+        updateData.data_finalizacao = new Date().toISOString();
       }
       if (action.nextStatus === "entregue") {
         updateData.data_entrega = new Date().toISOString();
@@ -449,7 +449,7 @@ export default function OrdemDetalhePage() {
 
       await (supabase.from("timeline_eventos") as any).insert({
         ordem_id: orderId,
-        usuario_id: user?.id || null,
+        responsavel_id: user?.id || null,
         tipo: action.timelineType,
         titulo: action.timelineTitle,
         descricao: `Status alterado para: ${ORDER_STATUS_LABELS[action.nextStatus]}`,
@@ -484,7 +484,7 @@ export default function OrdemDetalhePage() {
 
       await (supabase.from("timeline_eventos") as any).insert({
         ordem_id: orderId,
-        usuario_id: user?.id || null,
+        responsavel_id: user?.id || null,
         tipo: "atribuicao",
         titulo: "Tecnico atribuido",
         descricao: `Tecnico ${tecnicoNome} atribuido a OS`,
@@ -537,7 +537,7 @@ export default function OrdemDetalhePage() {
       const { data: { user } } = await supabase.auth.getUser();
       await (supabase.from("timeline_eventos") as any).insert({
         ordem_id: orderId,
-        usuario_id: user?.id || null,
+        responsavel_id: user?.id || null,
         tipo: "foto",
         titulo: "Foto adicionada",
         descricao: `Foto do tipo "${FOTO_TIPOS.find((t) => t.value === selectedFotoTipo)?.label}" adicionada`,
@@ -710,9 +710,9 @@ export default function OrdemDetalhePage() {
                       <p className="text-xs text-muted-foreground">Scooter</p>
                       <p className="font-medium">
                         {ordem.scooter?.modelo || "-"}
-                        {ordem.scooter?.placa && (
-                          <span className="text-muted-foreground ml-1">
-                            ({ordem.scooter.placa})
+                        {ordem.scooter?.chassi && (
+                          <span className="text-muted-foreground ml-1 font-mono text-xs">
+                            ({ordem.scooter.chassi})
                           </span>
                         )}
                       </p>
@@ -745,11 +745,11 @@ export default function OrdemDetalhePage() {
                     <Play className="h-4 w-4 text-muted-foreground mt-0.5" />
                     <div>
                       <p className="text-xs text-muted-foreground">
-                        KM Entrada
+                        KM Atual
                       </p>
                       <p className="font-medium">
-                        {ordem.km_entrada
-                          ? `${ordem.km_entrada.toLocaleString("pt-BR")} km`
+                        {ordem.km_atual
+                          ? `${ordem.km_atual.toLocaleString("pt-BR")} km`
                           : "-"}
                       </p>
                     </div>
@@ -763,8 +763,8 @@ export default function OrdemDetalhePage() {
                         <p>
                           Agendamento: {formatDate(ordem.data_agendamento)}
                         </p>
-                        <p>Entrada: {formatDate(ordem.data_entrada)}</p>
-                        <p>Conclusao: {formatDate(ordem.data_conclusao)}</p>
+                        <p>Recebimento: {formatDate(ordem.data_recebimento)}</p>
+                        <p>Conclusao: {formatDate(ordem.data_finalizacao)}</p>
                         <p>Entrega: {formatDate(ordem.data_entrega)}</p>
                       </div>
                     </div>
@@ -884,7 +884,7 @@ export default function OrdemDetalhePage() {
                           >
                             <img
                               src={foto.url}
-                              alt={foto.descricao || grupo.label}
+                              alt={grupo.label}
                               className="h-full w-full object-cover"
                             />
                           </div>
@@ -908,28 +908,29 @@ export default function OrdemDetalhePage() {
             <CardContent>
               {diagnostico ? (
                 <div className="space-y-4 text-sm">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">
-                      Descricao
-                    </p>
-                    <p>{diagnostico.descricao}</p>
-                  </div>
-                  {diagnostico.causa_raiz && (
+                  {diagnostico.problemas_encontrados && (
                     <div>
                       <p className="text-xs text-muted-foreground mb-1">
-                        Causa Raiz
+                        Problemas Encontrados
                       </p>
-                      <p>{diagnostico.causa_raiz}</p>
+                      <p>{diagnostico.problemas_encontrados}</p>
                     </div>
                   )}
-                  {diagnostico.componentes_afetados &&
-                    diagnostico.componentes_afetados.length > 0 && (
+                  {diagnostico.observacoes && (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">
+                        Observacoes
+                      </p>
+                      <p>{diagnostico.observacoes}</p>
+                    </div>
+                  )}
+                  {false && (
                       <div>
                         <p className="text-xs text-muted-foreground mb-1">
                           Componentes Afetados
                         </p>
                         <div className="flex flex-wrap gap-1.5">
-                          {diagnostico.componentes_afetados.map((comp, i) => (
+                          {[].map((comp: string, i: number) => (
                             <Badge key={i} variant="secondary">
                               {comp}
                             </Badge>
@@ -1026,30 +1027,18 @@ export default function OrdemDetalhePage() {
             <CardContent>
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Tipo</span>
-                  <span className="font-medium capitalize">
-                    {ordem.tipo}
+                  <span className="text-muted-foreground">Status</span>
+                  <span
+                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${ORDER_STATUS_COLORS[ordem.status]}`}
+                  >
+                    {ORDER_STATUS_LABELS[ordem.status]}
                   </span>
                 </div>
                 <Separator />
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Prioridade</span>
-                  <Badge
-                    variant={
-                      ordem.prioridade === "urgente"
-                        ? "destructive"
-                        : "secondary"
-                    }
-                    className="capitalize"
-                  >
-                    {ordem.prioridade}
-                  </Badge>
-                </div>
-                <Separator />
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Valor Total</span>
-                  <span className="font-bold">
-                    {formatCurrency(ordem.valor_total)}
+                  <span className="text-muted-foreground">KM Atual</span>
+                  <span className="font-medium">
+                    {ordem.km_atual ? `${ordem.km_atual.toLocaleString("pt-BR")} km` : "-"}
                   </span>
                 </div>
                 <Separator />

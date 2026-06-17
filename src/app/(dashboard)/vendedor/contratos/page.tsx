@@ -64,11 +64,10 @@ export default function VendedorContratosPage() {
     if (!user) return;
     setUserId(user.id);
 
-    // Load contratos created by this vendedor
+    // Load all contratos for clients this vendedor serves
     let query = supabase
       .from("contratos")
       .select("*, cliente:profiles!cliente_id(nome), scooter:scooters!scooter_id(modelo, chassi)")
-      .eq("criado_por", user.id)
       .order("created_at", { ascending: false });
 
     if (tipoFilter !== "todos") {
@@ -76,7 +75,7 @@ export default function VendedorContratosPage() {
     }
 
     if (search.trim()) {
-      query = query.or(`titulo.ilike.%${search}%,numero.ilike.%${search}%`);
+      query = query.ilike("titulo", `%${search}%`);
     }
 
     const { data: contratosData } = await query;
@@ -84,7 +83,7 @@ export default function VendedorContratosPage() {
 
     // Load templates, clients, scooters
     const [modelosRes, clientesRes, scootersRes] = await Promise.all([
-      supabase.from("modelos_contrato").select("*").eq("ativo", true).order("nome"),
+      supabase.from("modelos_contrato").select("*").eq("ativo", true).order("titulo"),
       supabase.from("profiles").select("*").eq("role", "cliente").eq("ativo", true).order("nome"),
       supabase.from("scooters").select("*").order("modelo"),
     ]);
@@ -140,7 +139,7 @@ export default function VendedorContratosPage() {
     }
     const modelo = modelos.find((m) => m.id === newContrato.modelo_id);
     if (modelo) {
-      const content = replaceVariables(modelo.conteudo, newContrato.cliente_id, newContrato.scooter_id);
+      const content = replaceVariables(modelo.conteudo_template, newContrato.cliente_id, newContrato.scooter_id);
       setPreviewContent(content);
       setPreviewOpen(true);
     }
@@ -161,29 +160,20 @@ export default function VendedorContratosPage() {
       if (newContrato.modelo_id) {
         const modelo = modelos.find((m) => m.id === newContrato.modelo_id);
         if (modelo) {
-          conteudo = replaceVariables(modelo.conteudo, newContrato.cliente_id, newContrato.scooter_id);
+          conteudo = replaceVariables(modelo.conteudo_template, newContrato.cliente_id, newContrato.scooter_id);
         }
       }
 
-      const numero = `CTR-${Date.now().toString(36).toUpperCase()}`;
       const titulo = newContrato.titulo || `${CONTRATO_TIPOS[newContrato.tipo as ContratoTipo]} - ${clientes.find((c) => c.id === newContrato.cliente_id)?.nome || ""}`;
 
-      const { error } = await (supabase.from("contratos") as any).insert({
-        numero,
+      const { error } = await supabase.from("contratos").insert({
         tipo: newContrato.tipo as ContratoTipo,
         titulo,
         conteudo,
         cliente_id: newContrato.cliente_id,
         scooter_id: newContrato.scooter_id || null,
-        ordem_id: null,
-        venda_id: null,
         status: "rascunho" as ContratoStatus,
-        valor: null,
-        data_envio: null,
-        data_visualizacao: null,
-        data_assinatura: null,
-        criado_por: userId,
-        modelo_id: newContrato.modelo_id || null,
+        variaveis: {},
       });
 
       if (error) {
@@ -205,7 +195,7 @@ export default function VendedorContratosPage() {
     const supabase = createClient();
     const { error } = await (supabase
       .from("contratos") as any)
-      .update({ status: "enviado" as ContratoStatus, data_envio: new Date().toISOString() })
+      .update({ status: "enviado" as ContratoStatus })
       .eq("id", contratoId);
 
     if (error) {
@@ -386,7 +376,7 @@ export default function VendedorContratosPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {filteredModelos.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
+                    <SelectItem key={m.id} value={m.id}>{m.titulo}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

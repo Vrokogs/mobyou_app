@@ -69,7 +69,7 @@ export default function ScootersPage() {
 
     let query = supabase
       .from("scooters")
-      .select("*, proprietario:profiles!proprietario_id(nome)")
+      .select("*, proprietario:profiles!cliente_id(nome)")
       .order("created_at", { ascending: false });
 
     if (search.trim()) {
@@ -131,16 +131,10 @@ export default function ScootersPage() {
       marca: formData.marca,
       cor: formData.cor || null,
       ano: formData.ano ? parseInt(formData.ano) : null,
-      numero_serie: formData.numero_serie || null,
-      chassi: formData.chassi || null,
-      proprietario_id: formData.cliente_id || null,
-      km_atual: 0,
-      status: "ativo",
-      placa: null,
-      motor_numero: null,
-      bateria_numero: null,
-      foto_url: null,
-      observacoes: null,
+      numero_serie: formData.numero_serie,
+      chassi: formData.chassi,
+      cliente_id: formData.cliente_id || null,
+      data_compra: formData.data_compra || null,
     });
 
     reset();

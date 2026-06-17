@@ -89,12 +89,12 @@ export default function ScooterDetailPage() {
         .order("created_at", { ascending: false }),
     ];
 
-    if (s.proprietario_id) {
+    if (s.cliente_id) {
       promises.push(
         supabase
           .from("profiles")
           .select("*")
-          .eq("id", s.proprietario_id)
+          .eq("id", s.cliente_id)
           .single()
       );
     }
@@ -111,7 +111,7 @@ export default function ScooterDetailPage() {
     setKmHistorico(kmResult.data ?? []);
     setCertificados(certResult.data ?? []);
 
-    if (s.proprietario_id && results[4]) {
+    if (s.cliente_id && results[4]) {
       const ownerResult = results[4] as { data: Profile | null };
       setOwner(ownerResult.data);
     }
@@ -384,11 +384,9 @@ export default function ScooterDetailPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Numero</TableHead>
-                      <TableHead>Tipo</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Data</TableHead>
                       <TableHead>KM Entrada</TableHead>
-                      <TableHead>Valor</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -397,7 +395,6 @@ export default function ScooterDetailPage() {
                         <TableCell className="font-medium">
                           {o.numero}
                         </TableCell>
-                        <TableCell className="capitalize">{o.tipo}</TableCell>
                         <TableCell>
                           <Badge
                             variant="secondary"
@@ -408,12 +405,7 @@ export default function ScooterDetailPage() {
                         </TableCell>
                         <TableCell>{formatDate(o.created_at)}</TableCell>
                         <TableCell>
-                          {o.km_entrada ? `${o.km_entrada} km` : "---"}
-                        </TableCell>
-                        <TableCell>
-                          {o.valor_total
-                            ? `R$ ${o.valor_total.toFixed(2)}`
-                            : "---"}
+                          {o.km_atual ? `${o.km_atual} km` : "---"}
                         </TableCell>
                       </TableRow>
                     ))}

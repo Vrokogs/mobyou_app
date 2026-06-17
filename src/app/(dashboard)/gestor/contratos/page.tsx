@@ -62,10 +62,10 @@ export default function ContratosPage() {
 
   // New modelo form
   const [newModelo, setNewModelo] = useState({
-    nome: "",
+    titulo: "",
     tipo: "" as string,
-    conteudo: "",
-    variaveis: "",
+    conteudo_template: "",
+    variaveis_disponiveis: "",
   });
 
   // Edit modelo
@@ -96,7 +96,7 @@ export default function ContratosPage() {
       .from("modelos_contrato")
       .select("*")
       .eq("ativo", true)
-      .order("nome");
+      .order("titulo");
     setModelos((data ?? []) as ModeloContrato[]);
   }, []);
 
@@ -177,29 +177,21 @@ export default function ContratosPage() {
       if (newContrato.modelo_id) {
         const modelo = modelos.find((m) => m.id === newContrato.modelo_id);
         if (modelo) {
-          conteudo = replaceVariables(modelo.conteudo, newContrato.cliente_id, newContrato.scooter_id);
+          conteudo = replaceVariables(modelo.conteudo_template, newContrato.cliente_id, newContrato.scooter_id);
         }
       }
 
       const numero = `CTR-${Date.now().toString(36).toUpperCase()}`;
       const titulo = newContrato.titulo || `${CONTRATO_TIPOS[newContrato.tipo as ContratoTipo]} - ${clientes.find((c) => c.id === newContrato.cliente_id)?.nome || ""}`;
 
-      const { error } = await (supabase.from("contratos") as any).insert({
-        numero,
+      const { error } = await supabase.from("contratos").insert({
         tipo: newContrato.tipo as ContratoTipo,
         titulo,
         conteudo,
         cliente_id: newContrato.cliente_id,
         scooter_id: newContrato.scooter_id || null,
-        ordem_id: null,
-        venda_id: null,
         status: "rascunho" as ContratoStatus,
-        valor: null,
-        data_envio: null,
-        data_visualizacao: null,
-        data_assinatura: null,
-        criado_por: user.id,
-        modelo_id: newContrato.modelo_id || null,
+        variaveis: {},
       });
 
       if (error) {
@@ -219,7 +211,7 @@ export default function ContratosPage() {
 
   async function handleSaveModelo(e: React.FormEvent) {
     e.preventDefault();
-    if (!newModelo.nome || !newModelo.tipo || !newModelo.conteudo) {
+    if (!newModelo.titulo || !newModelo.tipo || !newModelo.conteudo_template) {
       toast.error("Preencha todos os campos obrigatorios");
       return;
     }
@@ -230,19 +222,19 @@ export default function ContratosPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const variaveis = newModelo.variaveis
+      const variaveis_disponiveis = newModelo.variaveis_disponiveis
         .split(",")
         .map((v) => v.trim())
         .filter(Boolean);
 
       if (editingModelo) {
-        const { error } = await (supabase
-          .from("modelos_contrato") as any)
+        const { error } = await supabase
+          .from("modelos_contrato")
           .update({
-            nome: newModelo.nome,
+            titulo: newModelo.titulo,
             tipo: newModelo.tipo as ContratoTipo,
-            conteudo: newModelo.conteudo,
-            variaveis,
+            conteudo_template: newModelo.conteudo_template,
+            variaveis_disponiveis,
           })
           .eq("id", editingModelo.id);
 
@@ -252,11 +244,11 @@ export default function ContratosPage() {
           toast.success("Modelo atualizado!");
         }
       } else {
-        const { error } = await (supabase.from("modelos_contrato") as any).insert({
-          nome: newModelo.nome,
+        const { error } = await supabase.from("modelos_contrato").insert({
+          titulo: newModelo.titulo,
           tipo: newModelo.tipo as ContratoTipo,
-          conteudo: newModelo.conteudo,
-          variaveis,
+          conteudo_template: newModelo.conteudo_template,
+          variaveis_disponiveis,
           ativo: true,
           criado_por: user.id,
         });
@@ -269,7 +261,7 @@ export default function ContratosPage() {
       }
 
       setModeloDialogOpen(false);
-      setNewModelo({ nome: "", tipo: "", conteudo: "", variaveis: "" });
+      setNewModelo({ titulo: "", tipo: "", conteudo_template: "", variaveis_disponiveis: "" });
       setEditingModelo(null);
       loadModelos();
     } catch {
@@ -289,10 +281,10 @@ export default function ContratosPage() {
   function openEditModelo(modelo: ModeloContrato) {
     setEditingModelo(modelo);
     setNewModelo({
-      nome: modelo.nome,
+      titulo: modelo.titulo,
       tipo: modelo.tipo,
-      conteudo: modelo.conteudo,
-      variaveis: modelo.variaveis.join(", "),
+      conteudo_template: modelo.conteudo_template,
+      variaveis_disponiveis: (modelo.variaveis_disponiveis ?? []).join(", "),
     });
     setModeloDialogOpen(true);
   }
@@ -440,7 +432,7 @@ export default function ContratosPage() {
             <div className="flex justify-end">
               <Button onClick={() => {
                 setEditingModelo(null);
-                setNewModelo({ nome: "", tipo: "", conteudo: "", variaveis: "" });
+                setNewModelo({ titulo: "", tipo: "", conteudo_template: "", variaveis_disponiveis: "" });
                 setModeloDialogOpen(true);
               }}>
                 <Plus className="h-4 w-4 mr-1" />
@@ -470,7 +462,7 @@ export default function ContratosPage() {
                     <TableBody>
                       {modelos.map((modelo) => (
                         <TableRow key={modelo.id}>
-                          <TableCell className="font-medium">{modelo.nome}</TableCell>
+                          <TableCell className="font-medium">{modelo.titulo}</TableCell>
                           <TableCell>
                             <Badge variant="secondary">
                               {CONTRATO_TIPOS[modelo.tipo] ?? modelo.tipo}
@@ -478,14 +470,14 @@ export default function ContratosPage() {
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-wrap gap-1">
-                              {modelo.variaveis.slice(0, 3).map((v) => (
+                              {(modelo.variaveis_disponiveis ?? []).slice(0, 3).map((v) => (
                                 <Badge key={v} variant="outline" className="text-xs">
                                   {`{{${v}}}`}
                                 </Badge>
                               ))}
-                              {modelo.variaveis.length > 3 && (
+                              {(modelo.variaveis_disponiveis ?? []).length > 3 && (
                                 <Badge variant="outline" className="text-xs">
-                                  +{modelo.variaveis.length - 3}
+                                  +{(modelo.variaveis_disponiveis ?? []).length - 3}
                                 </Badge>
                               )}
                             </div>
@@ -543,7 +535,7 @@ export default function ContratosPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {filteredModelos.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
+                    <SelectItem key={m.id} value={m.id}>{m.titulo}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -609,11 +601,11 @@ export default function ContratosPage() {
           <form onSubmit={handleSaveModelo} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Nome do Modelo</Label>
+                <Label>Titulo do Modelo</Label>
                 <Input
                   placeholder="Ex: Contrato de Compra Padrao"
-                  value={newModelo.nome}
-                  onChange={(e) => setNewModelo({ ...newModelo, nome: e.target.value })}
+                  value={newModelo.titulo}
+                  onChange={(e) => setNewModelo({ ...newModelo, titulo: e.target.value })}
                   required
                 />
               </div>
@@ -636,8 +628,8 @@ export default function ContratosPage() {
               <Label>Variaveis (separadas por virgula)</Label>
               <Input
                 placeholder="cliente_nome, cliente_cpf, scooter_modelo, data_atual"
-                value={newModelo.variaveis}
-                onChange={(e) => setNewModelo({ ...newModelo, variaveis: e.target.value })}
+                value={newModelo.variaveis_disponiveis}
+                onChange={(e) => setNewModelo({ ...newModelo, variaveis_disponiveis: e.target.value })}
               />
               <p className="text-xs text-muted-foreground">
                 Variaveis disponiveis: cliente_nome, cliente_cpf, cliente_telefone, cliente_email, cliente_endereco, scooter_modelo, scooter_marca, scooter_chassi, scooter_numero_serie, scooter_cor, scooter_ano, data_atual, data_extenso
@@ -648,8 +640,8 @@ export default function ContratosPage() {
               <Label>Conteudo do Modelo</Label>
               <Textarea
                 placeholder="Digite o conteudo do contrato usando {{variavel}} para campos dinamicos..."
-                value={newModelo.conteudo}
-                onChange={(e) => setNewModelo({ ...newModelo, conteudo: e.target.value })}
+                value={newModelo.conteudo_template}
+                onChange={(e) => setNewModelo({ ...newModelo, conteudo_template: e.target.value })}
                 rows={12}
                 className="font-mono text-sm"
                 required

@@ -82,12 +82,12 @@ export default function ChassiPage() {
         .order("created_at", { ascending: false }),
     ];
 
-    if (scooter.proprietario_id) {
+    if (scooter.cliente_id) {
       promises.push(
         supabase
           .from("profiles")
           .select("*")
-          .eq("id", scooter.proprietario_id)
+          .eq("id", scooter.cliente_id)
           .single()
       );
     }
@@ -97,7 +97,7 @@ export default function ChassiPage() {
     const garantiasRes = results[0] as { data: Garantia[] | null };
     const ordensRes = results[1] as { data: OrdemServico[] | null };
     const certRes = results[2] as { data: Certificado[] | null };
-    const ownerRes = scooter.proprietario_id && results[3]
+    const ownerRes = scooter.cliente_id && results[3]
       ? (results[3] as { data: Profile | null })
       : null;
 
@@ -204,7 +204,6 @@ export default function ChassiPage() {
                         {result.scooter.marca} {result.scooter.modelo}
                       </Link>
                       <div className="flex gap-2 mt-1">
-                        <Badge variant="secondary">{result.scooter.status}</Badge>
                         {result.scooter.ano && (
                           <Badge variant="outline">{result.scooter.ano}</Badge>
                         )}
@@ -225,8 +224,8 @@ export default function ChassiPage() {
                       <span>{result.scooter.cor ?? "---"}</span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">KM:</span>{" "}
-                      <span>{result.scooter.km_atual} km</span>
+                      <span className="text-muted-foreground">Compra:</span>{" "}
+                      <span>{result.scooter.data_compra ? formatDate(result.scooter.data_compra) : "---"}</span>
                     </div>
                   </div>
                 </div>
@@ -306,24 +305,16 @@ export default function ChassiPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Tipo</TableHead>
                       <TableHead>Inicio</TableHead>
                       <TableHead>Fim</TableHead>
-                      <TableHead>KM Limite</TableHead>
                       <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {result.garantias.map((g) => (
                       <TableRow key={g.id}>
-                        <TableCell className="capitalize font-medium">
-                          {g.tipo}
-                        </TableCell>
                         <TableCell>{formatDate(g.data_inicio)}</TableCell>
                         <TableCell>{formatDate(g.data_fim)}</TableCell>
-                        <TableCell>
-                          {g.km_limite ? `${g.km_limite} km` : "---"}
-                        </TableCell>
                         <TableCell>
                           <Badge
                             variant="secondary"
@@ -363,10 +354,9 @@ export default function ChassiPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Numero</TableHead>
-                      <TableHead>Tipo</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>KM</TableHead>
                       <TableHead>Data</TableHead>
-                      <TableHead>Valor</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -375,7 +365,6 @@ export default function ChassiPage() {
                         <TableCell className="font-medium">
                           {o.numero}
                         </TableCell>
-                        <TableCell className="capitalize">{o.tipo}</TableCell>
                         <TableCell>
                           <Badge
                             variant="secondary"
@@ -384,12 +373,8 @@ export default function ChassiPage() {
                             {ORDER_STATUS_LABELS[o.status as OrdemServicoStatus] ?? o.status}
                           </Badge>
                         </TableCell>
+                        <TableCell>{o.km_atual ? `${o.km_atual} km` : "---"}</TableCell>
                         <TableCell>{formatDate(o.created_at)}</TableCell>
-                        <TableCell>
-                          {o.valor_total
-                            ? `R$ ${o.valor_total.toFixed(2)}`
-                            : "---"}
-                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -417,7 +402,7 @@ export default function ChassiPage() {
                           </div>
                           <div className="flex-1">
                             <p className="font-medium text-sm">
-                              #{cert.hash.slice(0, 8)}
+                              #{cert.id.slice(0, 8)}
                             </p>
                             <p className="text-xs text-muted-foreground">
                               {formatDate(cert.created_at)}

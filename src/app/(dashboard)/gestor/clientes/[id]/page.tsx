@@ -81,7 +81,7 @@ export default function ClienteDetailPage() {
         supabase
           .from("scooters")
           .select("*")
-          .eq("proprietario_id", clienteId)
+          .eq("cliente_id", clienteId)
           .order("created_at", { ascending: false }),
         supabase
           .from("ordens_servico")

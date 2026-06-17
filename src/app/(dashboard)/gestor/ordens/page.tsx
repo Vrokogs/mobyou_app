@@ -58,7 +58,7 @@ import { toast } from "sonner";
 interface OrdemWithRelations extends OrdemServico {
   cliente?: Pick<Profile, "id" | "nome">;
   tecnico?: Pick<Profile, "id" | "nome"> | null;
-  scooter?: Pick<Scooter, "id" | "modelo" | "placa">;
+  scooter?: Pick<Scooter, "id" | "modelo" | "chassi">;
 }
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
@@ -82,7 +82,7 @@ export default function OrdensPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [clientes, setClientes] = useState<Pick<Profile, "id" | "nome">[]>([]);
   const [scootersCliente, setScootersCliente] = useState<
-    Pick<Scooter, "id" | "modelo" | "placa">[]
+    Pick<Scooter, "id" | "modelo" | "chassi">[]
   >([]);
   const [newOS, setNewOS] = useState({
     cliente_id: "",
@@ -105,7 +105,7 @@ export default function OrdensPage() {
           *,
           cliente:profiles!ordens_servico_cliente_id_fkey(id, nome),
           tecnico:profiles!ordens_servico_tecnico_id_fkey(id, nome),
-          scooter:scooters!ordens_servico_scooter_id_fkey(id, modelo, placa)
+          scooter:scooters!ordens_servico_scooter_id_fkey(id, modelo, chassi)
         `
         )
         .order("created_at", { ascending: false });
@@ -141,10 +141,10 @@ export default function OrdensPage() {
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
     return (
-      os.numero?.toLowerCase().includes(term) ||
+      String(os.numero ?? "").toLowerCase().includes(term) ||
       os.cliente?.nome?.toLowerCase().includes(term) ||
       os.scooter?.modelo?.toLowerCase().includes(term) ||
-      os.scooter?.placa?.toLowerCase().includes(term)
+      os.scooter?.chassi?.toLowerCase().includes(term)
     );
   });
 
@@ -173,8 +173,8 @@ export default function OrdensPage() {
       const supabase = createClient();
       const { data } = await supabase
         .from("scooters")
-        .select("id, modelo, placa")
-        .eq("proprietario_id", clienteId)
+        .select("id, modelo, chassi")
+        .eq("cliente_id", clienteId)
         .order("modelo");
       setScootersCliente(data || []);
     } catch {
@@ -202,33 +202,27 @@ export default function OrdensPage() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
 
-      const numero = `OS-${Date.now().toString(36).toUpperCase()}`;
-
-      const { data, error } = await (supabase
-        .from("ordens_servico") as any)
+      const { data, error } = await supabase
+        .from("ordens_servico")
         .insert({
-          numero,
           cliente_id: newOS.cliente_id,
           scooter_id: newOS.scooter_id,
-          status: "agendado",
-          tipo: "manutencao",
-          prioridade: "normal",
+          status: "agendado" as const,
           data_agendamento: newOS.data_agendamento || null,
           observacoes: newOS.observacoes || null,
-          vendedor_id: user?.id || null,
         })
-        .select("id")
+        .select("id, numero")
         .single();
 
       if (error) throw error;
 
       if (data) {
-        await (supabase.from("timeline_eventos") as any).insert({
+        await supabase.from("timeline_eventos").insert({
           ordem_id: data.id,
-          usuario_id: user?.id || null,
+          responsavel_id: user?.id || null,
           tipo: "criacao",
           titulo: "Ordem de servico criada",
-          descricao: `OS ${numero} criada e agendada`,
+          descricao: `OS #${data.numero} criada e agendada`,
         });
       }
 
@@ -398,9 +392,9 @@ export default function OrdensPage() {
                       <span className="font-medium">
                         {os.scooter?.modelo || "-"}
                       </span>
-                      {os.scooter?.placa && (
+                      {os.scooter?.chassi && (
                         <span className="text-xs text-muted-foreground ml-1.5">
-                          {os.scooter.placa}
+                          {os.scooter.chassi}
                         </span>
                       )}
                     </div>
@@ -509,7 +503,7 @@ export default function OrdensPage() {
                   {scootersCliente.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
                       {s.modelo}
-                      {s.placa ? ` - ${s.placa}` : ""}
+                      {s.chassi ? ` - ${s.chassi}` : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>

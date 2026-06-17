@@ -49,7 +49,7 @@ export default function TecnicoOrdensPage() {
 
       const { data } = await supabase
         .from("ordens_servico")
-        .select("id, numero, status, km_atual, created_at, cliente:profiles!ordens_servico_cliente_id_fkey(nome), scooter:scooters!ordens_servico_scooter_id_fkey(modelo, chassi)")
+        .select("id, numero, status, km_atual, created_at, cliente:profiles!cliente_id(nome), scooter:scooters!scooter_id(modelo, chassi)")
         .eq("tecnico_id", user.id)
         .order("created_at", { ascending: false });
 

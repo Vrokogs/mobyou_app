@@ -48,7 +48,7 @@ export default function VendedorVendasPage() {
     if (!user) return;
 
     const [vendasRes, clientesRes, scootersRes] = await Promise.all([
-      supabase.from("vendas").select("*, cliente:profiles!vendas_cliente_id_fkey(nome), scooter:scooters!vendas_scooter_id_fkey(modelo, chassi)").eq("vendedor_id", user.id).order("created_at", { ascending: false }),
+      supabase.from("vendas").select("*, cliente:profiles!cliente_id(nome), scooter:scooters!scooter_id(modelo, chassi)").eq("vendedor_id", user.id).order("created_at", { ascending: false }),
       supabase.from("profiles").select("id, nome").eq("role", "cliente").order("nome"),
       supabase.from("scooters").select("id, modelo, chassi").is("cliente_id", null).order("modelo"),
     ]);

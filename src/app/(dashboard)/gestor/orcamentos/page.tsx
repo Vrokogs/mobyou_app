@@ -42,10 +42,7 @@ const STATUS_OPTIONS: { value: OrcamentoFilterStatus; label: string }[] = [
 ];
 
 function getOrcamentoStatus(orc: OrcamentoWithRelations): string {
-  if (orc.aprovado === true) return "aprovado";
-  if (orc.aprovado === false) return "rejeitado";
-  if (orc.data_aprovacao) return "enviado";
-  return "rascunho";
+  return orc.status ?? "rascunho";
 }
 
 function getStatusBadge(status: string) {
@@ -241,7 +238,7 @@ export default function OrcamentosPage() {
                       {orc.ordem?.cliente?.nome || "-"}
                     </TableCell>
                     <TableCell className="text-right font-medium">
-                      {formatCurrency(orc.valor_total)}
+                      {formatCurrency(orc.valor_total ?? 0)}
                     </TableCell>
                     <TableCell>
                       <span

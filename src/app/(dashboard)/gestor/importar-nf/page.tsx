@@ -251,7 +251,7 @@ export default function ImportarNFPage() {
           numero_serie: scooter.numero_serie || null,
           chassi: scooter.chassi || null,
           ano: scooter.ano ? parseInt(scooter.ano) : null,
-          proprietario_id: clienteId,
+          cliente_id: clienteId,
           km_atual: 0,
           status: "ativo",
           placa: null,

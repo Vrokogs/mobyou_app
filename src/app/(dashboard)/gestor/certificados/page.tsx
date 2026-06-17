@@ -1,61 +1,57 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { Award, Plus, Download, QrCode, Eye, FileText, CheckCircle2, Printer } from "lucide-react";
-import QRCode from "qrcode";
+import { Award, Plus, Eye, CheckCircle2, Wrench } from "lucide-react";
 
-interface CertificadoRow {
+interface Certificado {
   id: string;
-  contrato_id: string;
-  hash: string;
-  qr_code_url: string | null;
+  ordem_id: string | null;
+  cliente_id: string | null;
+  scooter_id: string | null;
+  tecnico_id: string | null;
+  servico_executado: string;
+  data_servico: string;
   pdf_url: string | null;
-  dados: Record<string, unknown>;
+  qr_code_data: string | null;
   created_at: string;
-  contrato?: {
-    titulo: string;
-    tipo: string;
-    numero: string;
-    cliente?: { nome: string } | null;
-    scooter?: { modelo: string; chassi: string | null } | null;
-  } | null;
+  cliente?: { nome: string } | null;
+  scooter?: { modelo: string; chassi: string | null } | null;
+  tecnico?: { nome: string } | null;
 }
 
 interface OrdemFinalizada {
   id: string;
-  numero: string;
+  numero: number;
   status: string;
-  descricao_problema: string | null;
-  data_conclusao: string | null;
   cliente: { id: string; nome: string } | null;
-  scooter: { id: string; modelo: string; marca: string; chassi: string | null } | null;
+  scooter: { id: string; modelo: string; chassi: string | null } | null;
   tecnico: { id: string; nome: string } | null;
 }
 
 export default function CertificadosPage() {
-  const [certificados, setCertificados] = useState<CertificadoRow[]>([]);
+  const [certificados, setCertificados] = useState<Certificado[]>([]);
   const [ordensFinal, setOrdensFinal] = useState<OrdemFinalizada[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [selectedOrdem, setSelectedOrdem] = useState("");
+  const [servicoExecutado, setServicoExecutado] = useState("");
   const [saving, setSaving] = useState(false);
-  const [previewCert, setPreviewCert] = useState<CertificadoRow | null>(null);
-  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>("");
-  const previewRef = useRef<HTMLDivElement>(null);
+  const [previewCert, setPreviewCert] = useState<Certificado | null>(null);
 
   useEffect(() => {
     loadData();
@@ -67,115 +63,47 @@ export default function CertificadosPage() {
     const [certRes, ordensRes] = await Promise.all([
       supabase
         .from("certificados")
-        .select("*, contrato:contratos!contrato_id(titulo, tipo, numero, cliente:profiles!cliente_id(nome), scooter:scooters!scooter_id(modelo, chassi))")
+        .select("*, cliente:profiles!cliente_id(nome), scooter:scooters!scooter_id(modelo, chassi), tecnico:profiles!tecnico_id(nome)")
         .order("created_at", { ascending: false }),
       supabase
         .from("ordens_servico")
-        .select("id, numero, status, descricao_problema, data_conclusao, cliente:profiles!cliente_id(id, nome), scooter:scooters!scooter_id(id, modelo, marca, chassi), tecnico:profiles!tecnico_id(id, nome)")
+        .select("id, numero, status, cliente:profiles!ordens_servico_cliente_id_fkey(id, nome), scooter:scooters!ordens_servico_scooter_id_fkey(id, modelo, chassi), tecnico:profiles!ordens_servico_tecnico_id_fkey(id, nome)")
         .in("status", ["finalizado", "entregue"]),
     ]);
 
-    setCertificados((certRes.data ?? []) as unknown as CertificadoRow[]);
+    setCertificados((certRes.data ?? []) as unknown as Certificado[]);
     setOrdensFinal((ordensRes.data ?? []) as unknown as OrdemFinalizada[]);
     setLoading(false);
   }
 
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedOrdem) return;
+    if (!selectedOrdem || !servicoExecutado.trim()) {
+      toast.error("Selecione a OS e descreva o servico executado");
+      return;
+    }
     setSaving(true);
 
     try {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
       const ordem = ordensFinal.find((o) => o.id === selectedOrdem);
       if (!ordem) return;
 
-      // Create a contrato for the certificate if needed
-      const contratoNumero = `CERT-${Date.now().toString(36).toUpperCase()}`;
-
-      const { data: contratoData, error: contratoError } = await (supabase
-        .from("contratos") as any)
-        .insert({
-          numero: contratoNumero,
-          tipo: "garantia" as const,
-          titulo: `Certificado de Servico - OS ${ordem.numero}`,
-          conteudo: `<h1>Certificado de Servico</h1>
-<p>Certificamos que o servico referente a Ordem de Servico <strong>#${ordem.numero}</strong> foi realizado com sucesso.</p>
-<p><strong>Cliente:</strong> ${ordem.cliente?.nome || "N/A"}</p>
-<p><strong>Scooter:</strong> ${ordem.scooter?.modelo || "N/A"} ${ordem.scooter?.marca || ""}</p>
-<p><strong>Chassi:</strong> ${ordem.scooter?.chassi || "N/A"}</p>
-<p><strong>Tecnico:</strong> ${ordem.tecnico?.nome || "N/A"}</p>
-<p><strong>Data de Conclusao:</strong> ${ordem.data_conclusao ? new Date(ordem.data_conclusao).toLocaleDateString("pt-BR") : new Date().toLocaleDateString("pt-BR")}</p>
-<p><strong>Descricao:</strong> ${ordem.descricao_problema || "Servico concluido"}</p>`,
-          cliente_id: ordem.cliente?.id || user.id,
-          scooter_id: ordem.scooter?.id || null,
-          ordem_id: ordem.id,
-          venda_id: null,
-          status: "assinado" as const,
-          valor: null,
-          data_envio: null,
-          data_visualizacao: null,
-          data_assinatura: new Date().toISOString(),
-          criado_por: user.id,
-          modelo_id: null,
-        })
-        .select("id")
-        .single();
-
-      if (contratoError || !contratoData) {
-        toast.error("Erro ao criar contrato do certificado", { description: contratoError?.message });
-        setSaving(false);
-        return;
-      }
-
-      // Generate hash
-      const hash = Array.from(
-        new Uint8Array(
-          await crypto.subtle.digest(
-            "SHA-256",
-            new TextEncoder().encode(`${(contratoData as any).id}-${Date.now()}-${ordem.numero}`)
-          )
-        )
-      ).map((b) => b.toString(16).padStart(2, "0")).join("");
-
-      // Generate QR code
-      const qrData = JSON.stringify({
-        tipo: "certificado_servico",
-        hash: hash.slice(0, 16),
-        os: ordem.numero,
-        data: new Date().toISOString(),
-        scooter: ordem.scooter?.chassi,
-        cliente: ordem.cliente?.nome,
-      });
-
-      let qrCodeUrl: string | null = null;
-      try {
-        qrCodeUrl = await QRCode.toDataURL(qrData, { width: 200, margin: 2 });
-      } catch {
-        // QR generation failed
-      }
-
-      const dados: Record<string, unknown> = {
-        ordem_numero: ordem.numero,
-        cliente_nome: ordem.cliente?.nome,
-        scooter_modelo: ordem.scooter?.modelo,
-        scooter_chassi: ordem.scooter?.chassi,
-        tecnico_nome: ordem.tecnico?.nome,
-        data_conclusao: ordem.data_conclusao,
-        descricao: ordem.descricao_problema,
-        gerado_por: user.id,
-        gerado_em: new Date().toISOString(),
-      };
-
-      const { error } = await (supabase.from("certificados") as any).insert({
-        contrato_id: (contratoData as any).id,
-        hash,
-        qr_code_url: qrCodeUrl,
+      const { error } = await supabase.from("certificados").insert({
+        ordem_id: ordem.id,
+        cliente_id: ordem.cliente?.id ?? null,
+        scooter_id: ordem.scooter?.id ?? null,
+        tecnico_id: ordem.tecnico?.id ?? null,
+        servico_executado: servicoExecutado,
+        data_servico: new Date().toISOString().split("T")[0],
         pdf_url: null,
-        dados,
+        qr_code_data: JSON.stringify({
+          tipo: "certificado_servico",
+          os: ordem.numero,
+          data: new Date().toISOString(),
+          chassi: ordem.scooter?.chassi,
+          cliente: ordem.cliente?.nome,
+        }),
       });
 
       if (error) {
@@ -186,61 +114,12 @@ export default function CertificadosPage() {
       toast.success("Certificado gerado com sucesso!");
       setDialogOpen(false);
       setSelectedOrdem("");
+      setServicoExecutado("");
       loadData();
     } catch {
       toast.error("Erro inesperado");
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function openPreview(cert: CertificadoRow) {
-    setPreviewCert(cert);
-
-    // Generate QR code for preview
-    if (cert.qr_code_url) {
-      setQrCodeDataUrl(cert.qr_code_url);
-    } else {
-      try {
-        const qrUrl = await QRCode.toDataURL(
-          JSON.stringify({ hash: cert.hash.slice(0, 16), id: cert.id }),
-          { width: 200, margin: 2 }
-        );
-        setQrCodeDataUrl(qrUrl);
-      } catch {
-        setQrCodeDataUrl("");
-      }
-    }
-
-    setPreviewOpen(true);
-  }
-
-  function handlePrint() {
-    if (!previewRef.current || !previewCert) return;
-    const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Certificado - ${previewCert.hash.slice(0, 8).toUpperCase()}</title>
-            <style>
-              body { font-family: Arial, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; }
-              .header { text-align: center; margin-bottom: 30px; }
-              .header h1 { font-size: 24px; margin-bottom: 5px; }
-              .field { margin: 10px 0; }
-              .field label { font-weight: bold; }
-              .qr { text-align: center; margin-top: 30px; }
-              .hash { text-align: center; font-family: monospace; font-size: 12px; color: #666; margin-top: 10px; }
-              .footer { text-align: center; margin-top: 40px; border-top: 1px solid #ddd; padding-top: 20px; font-size: 12px; color: #999; }
-            </style>
-          </head>
-          <body>
-            ${previewRef.current.innerHTML}
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.print();
     }
   }
 
@@ -258,9 +137,7 @@ export default function CertificadosPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Certificados</h1>
-          <p className="text-muted-foreground">
-            Gerencie certificados de servico e garantia.
-          </p>
+          <p className="text-muted-foreground">Gerencie certificados de servico.</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger render={<Button><Plus className="mr-2 h-4 w-4" />Gerar Certificado</Button>} />
@@ -274,7 +151,7 @@ export default function CertificadosPage() {
             <form onSubmit={handleGenerate} className="space-y-4">
               <div className="space-y-2">
                 <Label>Ordem de Servico Finalizada</Label>
-                <Select value={selectedOrdem} onValueChange={(v: string | null) => setSelectedOrdem(v ?? "")}>
+                <Select value={selectedOrdem} onValueChange={(v) => setSelectedOrdem(v ?? "")}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Selecione a OS" />
                   </SelectTrigger>
@@ -292,34 +169,16 @@ export default function CertificadosPage() {
                 </Select>
               </div>
 
-              {selectedOrdem && (() => {
-                const ordem = ordensFinal.find((o) => o.id === selectedOrdem);
-                if (!ordem) return null;
-                return (
-                  <Card className="bg-muted/50">
-                    <CardContent className="pt-4 space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Cliente:</span>
-                        <span className="font-medium">{ordem.cliente?.nome ?? "---"}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Scooter:</span>
-                        <span className="font-medium">{ordem.scooter?.modelo ?? "---"}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Tecnico:</span>
-                        <span className="font-medium">{ordem.tecnico?.nome ?? "---"}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Status:</span>
-                        <Badge variant="secondary" className="bg-green-100 text-green-800">
-                          {ordem.status}
-                        </Badge>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })()}
+              <div className="space-y-2">
+                <Label>Descricao do Servico Executado</Label>
+                <Textarea
+                  placeholder="Descreva o servico realizado..."
+                  value={servicoExecutado}
+                  onChange={(e) => setServicoExecutado(e.target.value)}
+                  rows={4}
+                  required
+                />
+              </div>
 
               <DialogFooter>
                 <Button type="submit" disabled={saving || !selectedOrdem}>
@@ -331,7 +190,6 @@ export default function CertificadosPage() {
         </Dialog>
       </div>
 
-      {/* Certificates Table */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -358,54 +216,41 @@ export default function CertificadosPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Hash</TableHead>
-                  <TableHead>Titulo</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Scooter</TableHead>
+                  <TableHead>Tecnico</TableHead>
+                  <TableHead>Servico</TableHead>
                   <TableHead>Data</TableHead>
-                  <TableHead>QR Code</TableHead>
                   <TableHead>Acoes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {certificados.map((cert) => (
                   <TableRow key={cert.id}>
-                    <TableCell className="font-mono text-xs">
-                      {cert.hash.slice(0, 12).toUpperCase()}...
-                    </TableCell>
                     <TableCell className="font-medium">
-                      {cert.contrato?.titulo ?? (cert.dados.ordem_numero ? `OS #${cert.dados.ordem_numero}` : "Certificado")}
+                      {cert.cliente?.nome ?? "---"}
                     </TableCell>
                     <TableCell>
-                      {cert.contrato?.cliente?.nome ?? (cert.dados.cliente_nome as string) ?? "---"}
-                    </TableCell>
-                    <TableCell>
-                      {cert.contrato?.scooter?.modelo ?? (cert.dados.scooter_modelo as string) ?? "---"}
-                    </TableCell>
-                    <TableCell>{formatDate(cert.created_at)}</TableCell>
-                    <TableCell>
-                      {cert.qr_code_url ? (
-                        <Badge variant="secondary" className="bg-green-100 text-green-800">
-                          <QrCode className="h-3 w-3 mr-1" />
-                          Sim
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary" className="text-muted-foreground">Nao</Badge>
+                      {cert.scooter?.modelo ?? "---"}
+                      {cert.scooter?.chassi && (
+                        <span className="text-xs text-muted-foreground ml-1">
+                          ({cert.scooter.chassi})
+                        </span>
                       )}
                     </TableCell>
+                    <TableCell>{cert.tecnico?.nome ?? "---"}</TableCell>
+                    <TableCell className="max-w-[200px] truncate">
+                      {cert.servico_executado}
+                    </TableCell>
+                    <TableCell>{formatDate(cert.data_servico)}</TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon-sm" onClick={() => openPreview(cert)}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        {cert.pdf_url && (
-                          <a href={cert.pdf_url} target="_blank" rel="noopener noreferrer">
-                            <Button variant="ghost" size="icon-sm">
-                              <Download className="h-4 w-4" />
-                            </Button>
-                          </a>
-                        )}
-                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => { setPreviewCert(cert); setPreviewOpen(true); }}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -415,9 +260,8 @@ export default function CertificadosPage() {
         </CardContent>
       </Card>
 
-      {/* Preview Dialog */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Award className="h-5 w-5 text-amber-500" />
@@ -426,97 +270,52 @@ export default function CertificadosPage() {
           </DialogHeader>
 
           {previewCert && (
-            <div ref={previewRef}>
-              <div className="border rounded-xl p-8 bg-white space-y-6">
-                {/* Header */}
-                <div className="text-center space-y-2">
-                  <div className="flex justify-center">
-                    <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center">
-                      <Award className="h-8 w-8 text-amber-600" />
-                    </div>
-                  </div>
-                  <h1 className="text-2xl font-bold">Certificado de Servico</h1>
-                  <p className="text-sm text-muted-foreground">MOBYOU E-Scooter Management</p>
-                </div>
-
-                <Separator />
-
-                {/* Details */}
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-muted-foreground text-xs uppercase tracking-wider">Cliente</p>
-                    <p className="font-medium">
-                      {previewCert.contrato?.cliente?.nome ?? (previewCert.dados.cliente_nome as string) ?? "---"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground text-xs uppercase tracking-wider">Scooter</p>
-                    <p className="font-medium">
-                      {previewCert.contrato?.scooter?.modelo ?? (previewCert.dados.scooter_modelo as string) ?? "---"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground text-xs uppercase tracking-wider">Chassi</p>
-                    <p className="font-mono text-sm">
-                      {previewCert.contrato?.scooter?.chassi ?? (previewCert.dados.scooter_chassi as string) ?? "---"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground text-xs uppercase tracking-wider">Tecnico</p>
-                    <p className="font-medium">
-                      {(previewCert.dados.tecnico_nome as string) ?? "---"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground text-xs uppercase tracking-wider">OS</p>
-                    <p className="font-medium">
-                      #{(previewCert.dados.ordem_numero as string) ?? previewCert.contrato?.numero ?? "---"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground text-xs uppercase tracking-wider">Data</p>
-                    <p className="font-medium">{formatDate(previewCert.created_at)}</p>
+            <div className="border rounded-xl p-6 bg-white space-y-4">
+              <div className="text-center space-y-2">
+                <div className="flex justify-center">
+                  <div className="w-14 h-14 rounded-full bg-amber-100 flex items-center justify-center">
+                    <Wrench className="h-7 w-7 text-amber-600" />
                   </div>
                 </div>
+                <h1 className="text-xl font-bold">Certificado de Servico</h1>
+                <p className="text-xs text-muted-foreground">MOBYOU LITORAL NORTE</p>
+              </div>
 
-                {!!(previewCert.dados.descricao) && (
-                  <>
-                    <Separator />
-                    <div>
-                      <p className="text-muted-foreground text-xs uppercase tracking-wider mb-1">Descricao do Servico</p>
-                      <p className="text-sm">{previewCert.dados.descricao as string}</p>
-                    </div>
-                  </>
-                )}
-
-                <Separator />
-
-                {/* QR Code & Verification */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-muted-foreground text-xs uppercase tracking-wider mb-1">Codigo de Verificacao</p>
-                    <p className="font-mono text-sm font-bold">{previewCert.hash.slice(0, 16).toUpperCase()}</p>
-                    <div className="flex items-center gap-1 mt-2 text-green-600">
-                      <CheckCircle2 className="h-4 w-4" />
-                      <span className="text-xs font-medium">Certificado Valido</span>
-                    </div>
-                  </div>
-                  {qrCodeDataUrl && (
-                    <div className="text-center">
-                      <img
-                        src={qrCodeDataUrl}
-                        alt="QR Code"
-                        className="w-32 h-32 border rounded"
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">Escaneie para verificar</p>
-                    </div>
-                  )}
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-muted-foreground text-xs uppercase tracking-wider">Cliente</p>
+                  <p className="font-medium">{previewCert.cliente?.nome ?? "---"}</p>
                 </div>
-
-                {/* Footer */}
-                <div className="text-center text-xs text-muted-foreground border-t pt-4">
-                  <p>Emitido em {formatDate(previewCert.created_at)} | MOBYOU</p>
+                <div>
+                  <p className="text-muted-foreground text-xs uppercase tracking-wider">Scooter</p>
+                  <p className="font-medium">{previewCert.scooter?.modelo ?? "---"}</p>
                 </div>
+                <div>
+                  <p className="text-muted-foreground text-xs uppercase tracking-wider">Chassi</p>
+                  <p className="font-mono text-sm">{previewCert.scooter?.chassi ?? "---"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs uppercase tracking-wider">Tecnico</p>
+                  <p className="font-medium">{previewCert.tecnico?.nome ?? "---"}</p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-muted-foreground text-xs uppercase tracking-wider">Data do Servico</p>
+                  <p className="font-medium">{formatDate(previewCert.data_servico)}</p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-muted-foreground text-xs uppercase tracking-wider mb-1">Servico Executado</p>
+                <p className="text-sm">{previewCert.servico_executado}</p>
+              </div>
+
+              <div className="flex items-center justify-center gap-2 pt-2 text-green-600">
+                <CheckCircle2 className="h-4 w-4" />
+                <span className="text-xs font-medium">Certificado Valido</span>
+              </div>
+
+              <div className="text-center text-xs text-muted-foreground border-t pt-3">
+                <p>Emitido em {formatDate(previewCert.created_at)} | MOBYOU</p>
               </div>
             </div>
           )}
@@ -524,10 +323,6 @@ export default function CertificadosPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setPreviewOpen(false)}>
               Fechar
-            </Button>
-            <Button onClick={handlePrint}>
-              <Printer className="h-4 w-4 mr-2" />
-              Imprimir / PDF
             </Button>
           </DialogFooter>
         </DialogContent>

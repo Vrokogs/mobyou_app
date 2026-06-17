@@ -46,22 +46,20 @@ export function OrcamentoForm({
   onSubmit,
   onSendToClient,
 }: OrcamentoFormProps) {
+  const rawPecas = existingOrcamento?.pecas as OrcamentoItem[] | null | undefined;
   const existingPecas: PecaItem[] =
-    existingOrcamento?.itens
-      ?.filter((i) => i.tipo === "peca")
-      .map((i) => ({
-        descricao: i.descricao,
-        quantidade: i.quantidade,
-        valor_unitario: i.valor_unitario,
-      })) || [];
+    rawPecas?.map((i) => ({
+      descricao: i.descricao,
+      quantidade: i.quantidade,
+      valor_unitario: i.valor_unitario,
+    })) || [];
 
+  const rawServicos = existingOrcamento?.servicos as OrcamentoItem[] | null | undefined;
   const existingServicos: ServicoItem[] =
-    existingOrcamento?.itens
-      ?.filter((i) => i.tipo === "servico")
-      .map((i) => ({
-        descricao: i.descricao,
-        preco: i.valor_total,
-      })) || [];
+    rawServicos?.map((i) => ({
+      descricao: i.descricao,
+      preco: i.valor_total,
+    })) || [];
 
   const [pecas, setPecas] = useState<PecaItem[]>(
     existingPecas.length > 0
@@ -74,7 +72,7 @@ export function OrcamentoForm({
       : [{ descricao: "", preco: 0 }]
   );
   const [maoObra, setMaoObra] = useState(
-    existingOrcamento?.valor_mao_obra || 0
+    existingOrcamento?.mao_de_obra || 0
   );
   const [custosAdicionais, setCustosAdicionais] = useState(0);
   const [prazoEstimado, setPrazoEstimado] = useState("");
@@ -170,18 +168,22 @@ export function OrcamentoForm({
     setSaving(true);
     try {
       const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
       const items = buildOrcamentoItems();
+
+      const pecasItems = items.filter((i) => i.tipo === "peca");
+      const servicosItems = items.filter((i) => i.tipo === "servico");
 
       const orcamentoData = {
         ordem_id: orderId,
-        diagnostico_id: diagnosticoData?.id || null,
-        itens: items,
-        valor_pecas: totalPecas,
-        valor_mao_obra: maoObra,
-        valor_desconto: 0,
+        criado_por: user?.id,
+        pecas: pecasItems,
+        servicos: servicosItems,
+        mao_de_obra: maoObra,
+        custos_adicionais: custosAdicionais,
+        prazo_estimado: prazoEstimado || null,
         valor_total: total,
-        observacoes: observacoes || null,
-        aprovado: null,
+        status: "rascunho" as const,
       };
 
       if (existingOrcamento) {
@@ -217,7 +219,7 @@ export function OrcamentoForm({
 
       await (supabase.from("timeline_eventos") as any).insert({
         ordem_id: orderId,
-        usuario_id: user?.id || null,
+        responsavel_id: user?.id || null,
         tipo: "orcamento_enviado",
         titulo: "Orcamento enviado ao cliente",
         descricao: `Valor total: ${formatCurrency(total)}`,
@@ -225,7 +227,7 @@ export function OrcamentoForm({
 
       await (supabase
         .from("ordens_servico") as any)
-        .update({ status: "orcamento_enviado", valor_total: total })
+        .update({ status: "orcamento_enviado" })
         .eq("id", orderId);
 
       toast.success("Orcamento enviado ao cliente");

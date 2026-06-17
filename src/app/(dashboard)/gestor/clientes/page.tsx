@@ -78,13 +78,13 @@ export default function ClientesPage() {
       const ids = clientList.map((c) => c.id);
       const { data: scooters } = await supabase
         .from("scooters")
-        .select("id, proprietario_id")
-        .in("proprietario_id", ids);
+        .select("id, cliente_id")
+        .in("cliente_id", ids);
 
       const counts: Record<string, number> = {};
       scooters?.forEach((s) => {
-        if (s.proprietario_id) {
-          counts[s.proprietario_id] = (counts[s.proprietario_id] || 0) + 1;
+        if (s.cliente_id) {
+          counts[s.cliente_id] = (counts[s.cliente_id] || 0) + 1;
         }
       });
       setScooterCounts(counts);

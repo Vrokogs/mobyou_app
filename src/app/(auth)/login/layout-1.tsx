@@ -21,14 +21,17 @@ export default function Layout1() {
     setLoading(true);
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
         toast.error(error.message === "Invalid login credentials" ? "E-mail ou senha incorretos" : error.message);
         return;
       }
-      const { data: profile } = await supabase.from("profiles").select("role").single();
-      if (profile) {
-        router.push({ gestor: "/gestor", vendedor: "/vendedor", tecnico: "/tecnico", cliente: "/cliente" }[profile.role] || "/cliente");
+      const userId = authData.user?.id;
+      const role = authData.user?.user_metadata?.role || "cliente";
+      if (userId) {
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", userId).single();
+        const finalRole = profile?.role || role;
+        router.push({ gestor: "/gestor", vendedor: "/vendedor", tecnico: "/tecnico", cliente: "/cliente" }[finalRole] || "/cliente");
         router.refresh();
       }
     } catch { toast.error("Erro inesperado"); } finally { setLoading(false); }

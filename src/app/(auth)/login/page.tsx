@@ -57,9 +57,7 @@ export default function LoginPage() {
           to { opacity: 1; transform: translateY(0); }
         }
         .animated-bg {
-          background: linear-gradient(-45deg, #060D18, #0B1A2D, #0A2A3A, #091E30, #0D2845, #061520);
-          background-size: 400% 400%;
-          animation: gradientShift 15s ease infinite;
+          background: #0B1A2D;
         }
         .float-logo {
           animation: floatLogo 4s ease-in-out infinite;
@@ -73,9 +71,6 @@ export default function LoginPage() {
       `}</style>
 
       <div className="animated-bg min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
-        {/* Ambient glows */}
-        <div className="absolute top-[10%] left-[15%] w-[350px] h-[350px] rounded-full bg-[#0A2A3A]/30 blur-[130px]" />
-        <div className="absolute bottom-[10%] right-[10%] w-[300px] h-[300px] rounded-full bg-[#0D2845]/25 blur-[120px]" />
 
         <div className="relative z-10 w-full max-w-[440px]">
           {/* Floating logo */}

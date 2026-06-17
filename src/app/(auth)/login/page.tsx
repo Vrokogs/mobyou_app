@@ -1,147 +1,79 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { createClient } from "@/lib/supabase/client";
-import { toast } from "sonner";
-import { Loader2, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { useState, lazy, Suspense } from "react";
+
+const Layout1 = lazy(() => import("./layout-1"));
+const Layout2 = lazy(() => import("./layout-2"));
+const Layout3 = lazy(() => import("./layout-3"));
+const Layout4 = lazy(() => import("./layout-4"));
+const Layout5 = lazy(() => import("./layout-5"));
+const Layout6 = lazy(() => import("./layout-6"));
+const Layout7 = lazy(() => import("./layout-7"));
+const Layout8 = lazy(() => import("./layout-8"));
+const Layout9 = lazy(() => import("./layout-9"));
+const Layout10 = lazy(() => import("./layout-10"));
+const Layout11 = lazy(() => import("./layout-11"));
+const Layout12 = lazy(() => import("./layout-12"));
+const Layout13 = lazy(() => import("./layout-13"));
+
+const layouts = [
+  { id: 1, name: "Minimal", component: Layout1 },
+  { id: 2, name: "Split", component: Layout2 },
+  { id: 3, name: "Card Premium", component: Layout3 },
+  { id: 4, name: "Neon Glow", component: Layout4 },
+  { id: 5, name: "Warm Gradient", component: Layout5 },
+  { id: 6, name: "Corporate", component: Layout6 },
+  { id: 7, name: "Dark Luxury", component: Layout7 },
+  { id: 8, name: "Two-Tone", component: Layout8 },
+  { id: 9, name: "Circle", component: Layout9 },
+  { id: 10, name: "Side Panel", component: Layout10 },
+  { id: 11, name: "Glass Blue", component: Layout11 },
+  { id: 12, name: "Brutalist", component: Layout12 },
+  { id: 13, name: "Animated", component: Layout13 },
+];
+
+function Loader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#050A12]">
+      <div className="w-8 h-8 border-2 border-[#C96B1D] border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const router = useRouter();
-
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-
-      if (error) {
-        toast.error("Erro ao fazer login", {
-          description: error.message === "Invalid login credentials"
-            ? "E-mail ou senha incorretos"
-            : error.message,
-        });
-        return;
-      }
-
-      const { data: profile } = await supabase.from("profiles").select("role").single();
-
-      if (profile) {
-        const routes: Record<string, string> = {
-          gestor: "/gestor", vendedor: "/vendedor",
-          tecnico: "/tecnico", cliente: "/cliente",
-        };
-        router.push(routes[profile.role] || "/cliente");
-        router.refresh();
-      }
-    } catch {
-      toast.error("Erro inesperado ao fazer login");
-    } finally {
-      setLoading(false);
-    }
-  }
+  const [selected, setSelected] = useState(0);
+  const Component = layouts[selected].component;
 
   return (
-    <div className="flex flex-col items-center gap-8 animate-[fadeIn_0.6s_ease-out]">
-      {/* Logo */}
-      <div className="relative">
-        <div className="absolute inset-0 bg-[#C96B1D]/10 rounded-full blur-[40px] scale-110" />
-        <img
-          src="/images/logo-mobyou.jpg"
-          alt="MOBYOU"
-          className="relative w-32 h-32 sm:w-36 sm:h-36 object-contain rounded-lg"
-        />
-      </div>
-
-      {/* Card */}
-      <div className="w-full animate-[slideUp_0.5s_ease-out_0.15s_both]">
-        <div className="rounded-2xl border border-[#1B3352]/60 bg-[#0B1A2D]/90 backdrop-blur-sm p-6 sm:p-8">
-          <div className="text-center mb-7">
-            <h1 className="text-xl sm:text-2xl font-bold text-white/95 tracking-tight">
-              Entrar na sua conta
-            </h1>
-            <p className="text-sm text-[#6B87A8] mt-1.5">
-              Informe suas credenciais para acessar
-            </p>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-5">
-            <div className="space-y-1.5">
-              <Label htmlFor="email" className="text-[#8DA4BE] text-sm">E-mail</Label>
-              <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#3A5A7A]" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="seu@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-11 h-12 bg-[#081320] border-[#1B3352] text-white placeholder:text-[#2A4A6A] rounded-xl focus:border-[#C96B1D] focus:ring-1 focus:ring-[#C96B1D]/25 transition-all"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password" className="text-[#8DA4BE] text-sm">Senha</Label>
-                <Link href="/recuperar-senha" className="text-xs text-[#C96B1D] hover:text-[#E89030] transition-colors">
-                  Esqueceu a senha?
-                </Link>
-              </div>
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#3A5A7A]" />
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Sua senha"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-11 pr-11 h-12 bg-[#081320] border-[#1B3352] text-white placeholder:text-[#2A4A6A] rounded-xl focus:border-[#C96B1D] focus:ring-1 focus:ring-[#C96B1D]/25 transition-all"
-                  required
-                />
-                <button type="button" onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#3A5A7A] hover:text-[#8DA4BE] transition-colors">
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
-
-            <div className="pt-1">
-              <Button
-                type="submit"
-                className="w-full h-12 bg-gradient-to-r from-[#A65D1A] via-[#C96B1D] to-[#E89030] hover:from-[#934F14] hover:via-[#B5601A] hover:to-[#D4802A] text-white font-bold text-sm tracking-widest rounded-xl shadow-[0_4px_24px_rgba(201,107,29,0.3)] hover:shadow-[0_6px_32px_rgba(201,107,29,0.45)] transition-all duration-300 active:scale-[0.98]"
-                disabled={loading}
-              >
-                {loading ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />ENTRANDO...</>
-                ) : (
-                  "ENTRAR"
-                )}
-              </Button>
-            </div>
-          </form>
+    <div className="relative">
+      <div className="fixed top-0 left-0 right-0 z-50 bg-[#050A12]/95 backdrop-blur-md border-b border-[#1B3352]/50 px-2 py-2">
+        <div className="flex items-center gap-1.5 overflow-x-auto max-w-full px-2">
+          <span className="text-white/30 text-[10px] mr-1 flex-shrink-0">LAYOUT</span>
+          {layouts.map((l, i) => (
+            <button
+              key={l.id}
+              onClick={() => setSelected(i)}
+              className={`flex-shrink-0 px-3 py-1 rounded-full text-[11px] font-bold transition-all ${
+                selected === i
+                  ? "bg-[#C96B1D] text-white shadow-lg"
+                  : "bg-[#0B1A2D] text-[#5A7A9A] hover:text-white border border-[#1B3352]/50"
+              }`}
+            >
+              {l.id}
+            </button>
+          ))}
         </div>
       </div>
 
-      <p className="text-[11px] text-[#2A4A6A] tracking-widest animate-[fadeIn_0.5s_ease-out_0.5s_both]">
-        LITORAL NORTE &bull; MOBILIDADE ELÉTRICA
-      </p>
+      <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-50 bg-[#0B1A2D]/90 backdrop-blur border border-[#1B3352]/50 px-4 py-2 rounded-full">
+        <p className="text-white/80 text-xs font-bold tracking-wider">
+          {layouts[selected].id}. {layouts[selected].name.toUpperCase()}
+        </p>
+      </div>
 
-      <style jsx>{`
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
-      `}</style>
+      <Suspense fallback={<Loader />}>
+        <Component />
+      </Suspense>
     </div>
   );
 }

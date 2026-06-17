@@ -57,13 +57,11 @@ export default function DashboardLayout({
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="space-y-4 w-64">
-          <Skeleton className="h-8 w-48 mx-auto" />
-          <Skeleton className="h-4 w-32 mx-auto" />
-          <div className="flex justify-center">
-            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
+      <div className="flex h-screen items-center justify-center bg-[#0A1628]">
+        <div className="flex flex-col items-center gap-6">
+          <img src="/images/logo-mobyou.svg" alt="MOBYOU" className="w-24 h-24" />
+          <div className="w-8 h-8 border-2 border-[#D4731A] border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-white/50">Carregando...</p>
         </div>
       </div>
     );
@@ -80,11 +78,11 @@ export default function DashboardLayout({
         onLogout={handleLogout}
       />
       <SidebarInset>
-        <header className="flex h-14 items-center gap-2 border-b px-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
-          <SidebarTrigger />
+        <header className="flex h-14 items-center gap-2 border-b border-[#d5d9e0] px-4 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 sticky top-0 z-10">
+          <SidebarTrigger className="text-[#0A1628]" />
           <Separator orientation="vertical" className="h-6" />
         </header>
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-4 sm:p-6 bg-[#f0f2f5] min-h-[calc(100vh-3.5rem)]">
           {children}
         </main>
       </SidebarInset>

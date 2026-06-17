@@ -125,15 +125,20 @@ export function AppSidebar({ userRole, userName, userEmail, onLogout }: AppSideb
     <Sidebar>
       <SidebarHeader className="p-4">
         <Link href={`/${userRole}`} className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-sidebar-primary flex items-center justify-center">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-sidebar-primary-foreground">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 6v6l4 2" />
-            </svg>
+          <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0">
+            <img
+              src="/images/logo-mobyou.svg"
+              alt="MOBYOU"
+              className="w-full h-full object-contain"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+              }}
+            />
           </div>
           <div>
-            <span className="font-bold text-lg text-sidebar-foreground">MOBYOU</span>
-            <p className="text-xs text-sidebar-foreground/60 capitalize">{userRole}</p>
+            <span className="font-bold text-lg text-[#D4731A]">MOBYOU</span>
+            <p className="text-xs text-sidebar-foreground/50 capitalize">{userRole}</p>
           </div>
         </Link>
       </SidebarHeader>
@@ -171,7 +176,7 @@ export function AppSidebar({ userRole, userName, userEmail, onLogout }: AppSideb
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton className="h-auto py-2">
                   <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground text-xs">
+                    <AvatarFallback className="bg-[#D4731A] text-white text-xs font-bold">
                       {initials}
                     </AvatarFallback>
                   </Avatar>

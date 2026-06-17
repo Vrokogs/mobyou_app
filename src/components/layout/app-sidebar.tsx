@@ -127,7 +127,7 @@ export function AppSidebar({ userRole, userName, userEmail, onLogout }: AppSideb
         <Link href={`/${userRole}`} className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0">
             <img
-              src="/images/logo-mobyou.svg"
+              src="/images/logo-mobyou.jpg"
               alt="MOBYOU"
               className="w-full h-full object-contain"
               onError={(e) => {

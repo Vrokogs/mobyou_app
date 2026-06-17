@@ -65,7 +65,7 @@ export default function LoginPage() {
       <div className="relative">
         <div className="absolute inset-0 bg-[#D4731A]/15 rounded-full blur-[50px]" />
         <img
-          src="/images/logo-mobyou.svg"
+          src="/images/logo-mobyou.jpg"
           alt="MOBYOU"
           className="relative w-32 h-32 sm:w-36 sm:h-36 object-contain"
         />

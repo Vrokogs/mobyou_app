@@ -59,7 +59,7 @@ export default function DashboardLayout({
     return (
       <div className="flex h-screen items-center justify-center bg-[#0A1628]">
         <div className="flex flex-col items-center gap-6">
-          <img src="/images/logo-mobyou.svg" alt="MOBYOU" className="w-24 h-24" />
+          <img src="/images/logo-mobyou.jpg" alt="MOBYOU" className="w-24 h-24" />
           <div className="w-8 h-8 border-2 border-[#D4731A] border-t-transparent rounded-full animate-spin" />
           <p className="text-sm text-white/50">Carregando...</p>
         </div>

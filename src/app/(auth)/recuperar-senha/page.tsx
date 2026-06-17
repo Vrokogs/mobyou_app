@@ -41,7 +41,7 @@ export default function RecuperarSenhaPage() {
   if (sent) {
     return (
       <div className="flex flex-col items-center gap-10 animate-[fadeIn_0.6s_ease-out]">
-        <img src="/images/logo-mobyou.png" alt="MOBYOU" className="w-28 h-28 object-contain drop-shadow-[0_0_30px_rgba(212,115,26,0.3)]"
+        <img src="/images/logo-mobyou.svg" alt="MOBYOU" className="w-28 h-28 object-contain drop-shadow-[0_0_30px_rgba(212,115,26,0.3)]"
           onError={(e) => { (e.target as HTMLImageElement).src = "/images/logo-mobyou.svg"; }} />
 
         <div className="w-full relative rounded-2xl overflow-hidden">
@@ -74,7 +74,7 @@ export default function RecuperarSenhaPage() {
 
   return (
     <div className="flex flex-col items-center gap-10 animate-[fadeIn_0.6s_ease-out]">
-      <img src="/images/logo-mobyou.png" alt="MOBYOU" className="w-28 h-28 object-contain drop-shadow-[0_0_30px_rgba(212,115,26,0.3)]"
+      <img src="/images/logo-mobyou.svg" alt="MOBYOU" className="w-28 h-28 object-contain drop-shadow-[0_0_30px_rgba(212,115,26,0.3)]"
         onError={(e) => { (e.target as HTMLImageElement).src = "/images/logo-mobyou.svg"; }} />
 
       <div className="w-full relative rounded-2xl overflow-hidden animate-[slideUp_0.5s_ease-out_0.2s_both]">

@@ -61,17 +61,13 @@ export default function LoginPage() {
 
   return (
     <div className="flex flex-col items-center gap-10 animate-[fadeIn_0.6s_ease-out]">
-      {/* Logo with glow effect */}
-      <div className="relative group">
-        <div className="absolute inset-0 bg-[#D4731A]/20 rounded-full blur-[40px] scale-75 group-hover:scale-100 transition-transform duration-700" />
+      {/* Logo */}
+      <div className="relative">
+        <div className="absolute inset-0 bg-[#D4731A]/15 rounded-full blur-[50px]" />
         <img
-          src="/images/logo-mobyou.png"
+          src="/images/logo-mobyou.svg"
           alt="MOBYOU"
-          className="relative w-36 h-36 sm:w-40 sm:h-40 object-contain drop-shadow-[0_0_30px_rgba(212,115,26,0.3)]"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement;
-            target.src = "/images/logo-mobyou.svg";
-          }}
+          className="relative w-32 h-32 sm:w-36 sm:h-36 object-contain"
         />
       </div>
 
@@ -87,10 +83,10 @@ export default function LoginPage() {
           <div className="relative p-6 sm:p-8">
             {/* Header */}
             <div className="text-center mb-8">
-              <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">
+              <h1 className="text-xl sm:text-2xl font-bold text-white mb-2 tracking-tight">
                 Entrar na sua conta
               </h1>
-              <p className="text-sm text-[#5a7090]">
+              <p className="text-sm text-[#5a7090] font-light tracking-wide">
                 Informe suas credenciais para acessar
               </p>
             </div>

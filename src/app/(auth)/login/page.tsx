@@ -21,16 +21,35 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
         toast.error(error.message === "Invalid login credentials" ? "E-mail ou senha incorretos" : error.message);
         return;
       }
-      const { data: profile } = await supabase.from("profiles").select("role").single();
-      if (profile) {
-        router.push({ gestor: "/gestor", vendedor: "/vendedor", tecnico: "/tecnico", cliente: "/cliente" }[profile.role] || "/cliente");
-        router.refresh();
+
+      const userId = authData.user?.id;
+      if (!userId) {
+        toast.error("Erro ao obter usuário");
+        return;
       }
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", userId)
+        .single();
+
+      if (profileError || !profile) {
+        const role = authData.user?.user_metadata?.role || "cliente";
+        const routes: Record<string, string> = { gestor: "/gestor", vendedor: "/vendedor", tecnico: "/tecnico", cliente: "/cliente" };
+        router.push(routes[role] || "/cliente");
+        router.refresh();
+        return;
+      }
+
+      const routes: Record<string, string> = { gestor: "/gestor", vendedor: "/vendedor", tecnico: "/tecnico", cliente: "/cliente" };
+      router.push(routes[profile.role] || "/cliente");
+      router.refresh();
     } catch {
       toast.error("Erro inesperado");
     } finally {

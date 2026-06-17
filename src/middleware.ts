@@ -16,7 +16,7 @@ const PROTECTED_PREFIXES: { prefix: string; role: Role }[] = [
   { prefix: '/cliente', role: 'cliente' },
 ];
 
-const PUBLIC_ROUTES = ['/login', '/registro', '/reset-password', '/auth/callback'];
+const PUBLIC_ROUTES = ['/login', '/registro', '/recuperar-senha', '/primeiro-acesso', '/reset-password', '/auth/callback'];
 
 function isPublicRoute(pathname: string): boolean {
   return PUBLIC_ROUTES.some(
@@ -25,7 +25,7 @@ function isPublicRoute(pathname: string): boolean {
 }
 
 function getDashboardPath(role: Role): string {
-  return `${ROLE_ROUTES[role]}/dashboard`;
+  return ROLE_ROUTES[role];
 }
 
 export async function middleware(request: NextRequest) {

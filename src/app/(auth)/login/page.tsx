@@ -6,7 +6,6 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { Loader2, Mail, Lock, Eye, EyeOff } from "lucide-react";
@@ -61,95 +60,138 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex flex-col items-center gap-8">
-      {/* Logo acima do card */}
-      <div className="flex flex-col items-center gap-3">
+    <div className="flex flex-col items-center gap-10 animate-[fadeIn_0.6s_ease-out]">
+      {/* Logo with glow effect */}
+      <div className="relative group">
+        <div className="absolute inset-0 bg-[#D4731A]/20 rounded-full blur-[40px] scale-75 group-hover:scale-100 transition-transform duration-700" />
         <img
-          src="/images/logo-mobyou.svg"
+          src="/images/logo-mobyou.png"
           alt="MOBYOU"
-          className="w-28 h-28 object-contain drop-shadow-2xl"
+          className="relative w-36 h-36 sm:w-40 sm:h-40 object-contain drop-shadow-[0_0_30px_rgba(212,115,26,0.3)]"
+          onError={(e) => {
+            const target = e.target as HTMLImageElement;
+            target.src = "/images/logo-mobyou.svg";
+          }}
         />
       </div>
 
-      {/* Card de login */}
-      <Card className="w-full border-0 shadow-2xl shadow-black/20 bg-white/95 backdrop-blur">
-        <CardHeader className="text-center space-y-1 pb-2">
-          <CardTitle className="text-xl font-bold text-[#0A1628]">
-            Entrar na sua conta
-          </CardTitle>
-          <CardDescription className="text-sm text-[#5a6577]">
-            Informe suas credenciais para acessar
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-[#0A1628] font-medium">E-mail</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#5a6577]" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="seu@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10 h-11 bg-white border-[#d5d9e0] focus:border-[#D4731A] focus:ring-[#D4731A]/20"
-                  required
-                />
-              </div>
+      {/* Login card with glassmorphism */}
+      <div className="w-full animate-[slideUp_0.5s_ease-out_0.2s_both]">
+        <div className="relative rounded-2xl overflow-hidden">
+          {/* Card border gradient */}
+          <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-[#D4731A]/20 via-white/[0.05] to-transparent p-px">
+            <div className="w-full h-full rounded-2xl bg-[#0c1525]" />
+          </div>
+
+          {/* Card content */}
+          <div className="relative p-6 sm:p-8">
+            {/* Header */}
+            <div className="text-center mb-8">
+              <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">
+                Entrar na sua conta
+              </h1>
+              <p className="text-sm text-[#5a7090]">
+                Informe suas credenciais para acessar
+              </p>
             </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password" className="text-[#0A1628] font-medium">Senha</Label>
-                <Link
-                  href="/recuperar-senha"
-                  className="text-sm text-[#D4731A] hover:text-[#E8871E] hover:underline font-medium"
-                >
-                  Esqueceu a senha?
-                </Link>
+
+            {/* Form */}
+            <form onSubmit={handleLogin} className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-[#8aa0be] text-sm font-medium">
+                  E-mail
+                </Label>
+                <div className="relative">
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#3d5575]" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="seu@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="pl-11 h-12 bg-[#0a1220] border-[#1a2e48] text-white placeholder:text-[#2d4560] rounded-xl focus:border-[#D4731A] focus:ring-1 focus:ring-[#D4731A]/30 transition-all"
+                    required
+                  />
+                </div>
               </div>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#5a6577]" />
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Sua senha"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 pr-10 h-11 bg-white border-[#d5d9e0] focus:border-[#D4731A] focus:ring-[#D4731A]/20"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#5a6577] hover:text-[#0A1628]"
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password" className="text-[#8aa0be] text-sm font-medium">
+                    Senha
+                  </Label>
+                  <Link
+                    href="/recuperar-senha"
+                    className="text-xs text-[#D4731A] hover:text-[#E8871E] transition-colors font-medium"
+                  >
+                    Esqueceu a senha?
+                  </Link>
+                </div>
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#3d5575]" />
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Sua senha"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pl-11 pr-11 h-12 bg-[#0a1220] border-[#1a2e48] text-white placeholder:text-[#2d4560] rounded-xl focus:border-[#D4731A] focus:ring-1 focus:ring-[#D4731A]/30 transition-all"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#3d5575] hover:text-[#8aa0be] transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
+
+              <div className="pt-2">
+                <Button
+                  type="submit"
+                  className="w-full h-12 bg-gradient-to-r from-[#D4731A] to-[#E8871E] hover:from-[#c06816] hover:to-[#d47a18] text-white font-bold text-sm tracking-widest rounded-xl shadow-[0_4px_20px_rgba(212,115,26,0.35)] hover:shadow-[0_6px_30px_rgba(212,115,26,0.5)] transition-all duration-300 active:scale-[0.98]"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ENTRANDO...
+                    </>
+                  ) : (
+                    "ENTRAR"
+                  )}
+                </Button>
+              </div>
+            </form>
+
+            {/* Divider */}
+            <div className="mt-8 flex items-center gap-3">
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent to-[#1a2e48]" />
+              <span className="text-[10px] text-[#3d5575] tracking-widest uppercase">Mobyou</span>
+              <div className="flex-1 h-px bg-gradient-to-l from-transparent to-[#1a2e48]" />
             </div>
-            <Button
-              type="submit"
-              className="w-full h-11 bg-[#D4731A] hover:bg-[#c06816] text-white font-semibold text-sm tracking-wide shadow-lg shadow-[#D4731A]/25 transition-all active:scale-[0.98]"
-              disabled={loading}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Entrando...
-                </>
-              ) : (
-                "ENTRAR"
-              )}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+          </div>
+        </div>
+      </div>
 
       {/* Footer */}
-      <p className="text-xs text-white/30">
-        MOBYOU Litoral Norte &bull; Mobilidade Elétrica
+      <p className="text-[11px] text-[#2d4560] tracking-wider animate-[fadeIn_0.5s_ease-out_0.6s_both]">
+        LITORAL NORTE &bull; MOBILIDADE ELÉTRICA
       </p>
+
+      {/* Keyframe animations */}
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }

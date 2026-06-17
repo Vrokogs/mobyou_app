@@ -1,190 +1,349 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { DollarSign, TrendingUp, TrendingDown, BarChart3 } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  DollarSign, TrendingUp, TrendingDown, BarChart3, Receipt, Target,
+} from "lucide-react";
 
-interface FinanceiroData {
-  receita_mensal: number;
-  ticket_medio: number;
-  receita_anual: number;
-  custos: number;
-  lucro: number;
-  vendas_recentes: Array<{
-    id: string;
-    cliente_nome: string;
-    valor: number;
-    data: string;
-    tipo: string;
-  }>;
-  receita_por_mes: Array<{ mes: string; valor: number }>;
+const MONTHS = [
+  "Janeiro", "Fevereiro", "Marco", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+];
+
+interface VendaRow {
+  id: string;
+  numero: string;
+  valor: number;
+  valor_final: number;
+  valor_desconto: number;
+  forma_pagamento: string;
+  parcelas: number | null;
+  data_venda: string;
+  status: string;
+  cliente?: { nome: string } | null;
+  scooter?: { modelo: string } | null;
+  vendedor?: { nome: string } | null;
 }
 
-const MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+interface OrcRow {
+  valor_total: number;
+  created_at: string;
+}
 
 export default function FinanceiroPage() {
-  const [data, setData] = useState<FinanceiroData | null>(null);
+  const [vendas, setVendas] = useState<VendaRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [ano, setAno] = useState(new Date().getFullYear().toString());
+  const [selectedMonth, setSelectedMonth] = useState(String(new Date().getMonth() + 1));
+  const [selectedYear, setSelectedYear] = useState(String(new Date().getFullYear()));
+  const [monthlyData, setMonthlyData] = useState<{ month: string; total: number }[]>([]);
+  const [servicosReceita, setServicosReceita] = useState(0);
 
-  useEffect(() => {
-    loadData();
-  }, [ano]);
-
-  async function loadData() {
+  const loadFinanceiro = useCallback(async () => {
     setLoading(true);
     const supabase = createClient();
-    const anoNum = parseInt(ano);
-    const startOfYear = new Date(anoNum, 0, 1).toISOString();
-    const endOfYear = new Date(anoNum, 11, 31, 23, 59, 59).toISOString();
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const year = parseInt(selectedYear);
+    const month = parseInt(selectedMonth);
 
-    const { data: vendas } = await supabase
+    // Vendas do mes selecionado
+    const startDate = new Date(year, month - 1, 1).toISOString().slice(0, 10);
+    const endDate = new Date(year, month, 0).toISOString().slice(0, 10);
+
+    const { data: vendasData } = await supabase
       .from("vendas")
-      .select("id, valor_total, created_at, cliente:profiles!vendas_cliente_id_fkey(nome)")
-      .gte("created_at", startOfYear)
-      .lte("created_at", endOfYear)
-      .order("created_at", { ascending: false });
+      .select("*, cliente:profiles!vendas_cliente_id_fkey(nome), scooter:scooters!vendas_scooter_id_fkey(modelo), vendedor:profiles!vendas_vendedor_id_fkey(nome)")
+      .gte("data_venda", startDate)
+      .lte("data_venda", endDate)
+      .order("data_venda", { ascending: false });
 
-    const { data: orcamentos } = await supabase
+    setVendas((vendasData ?? []) as VendaRow[]);
+
+    // Orcamentos aprovados (servicos) no mes
+    const { data: orcData } = await supabase
       .from("orcamentos")
       .select("valor_total, created_at")
-      .eq("status", "aprovado")
-      .gte("created_at", startOfYear)
-      .lte("created_at", endOfYear);
+      .gte("created_at", `${startDate}T00:00:00`)
+      .lte("created_at", `${endDate}T23:59:59`);
 
-    const vendasArr = vendas || [];
-    const orcArr = orcamentos || [];
+    const orcArr = (orcData ?? []) as OrcRow[];
+    setServicosReceita(orcArr.reduce((sum, o) => sum + (o.valor_total || 0), 0));
 
-    const receitaVendas = vendasArr.reduce((sum, v) => sum + (v.valor_total || 0), 0);
-    const receitaServicos = orcArr.reduce((sum, o) => sum + (o.valor_total || 0), 0);
-    const receitaTotal = receitaVendas + receitaServicos;
+    // Dados anuais para grafico
+    const yearStart = `${year}-01-01`;
+    const yearEnd = `${year}-12-31`;
 
-    const vendasMes = vendasArr.filter(v => v.created_at >= startOfMonth);
-    const orcMes = orcArr.filter(o => o.created_at >= startOfMonth);
-    const receitaMensal = vendasMes.reduce((sum, v) => sum + (v.valor_total || 0), 0) +
-      orcMes.reduce((sum, o) => sum + (o.valor_total || 0), 0);
+    const [yearVendas, yearOrc] = await Promise.all([
+      supabase.from("vendas").select("valor_final, data_venda").gte("data_venda", yearStart).lte("data_venda", yearEnd),
+      supabase.from("orcamentos").select("valor_total, created_at").gte("created_at", `${yearStart}T00:00:00`).lte("created_at", `${yearEnd}T23:59:59`),
+    ]);
 
-    const totalTransacoes = vendasArr.length + orcArr.length;
-    const ticketMedio = totalTransacoes > 0 ? receitaTotal / totalTransacoes : 0;
-
-    const receitaPorMes = MESES.map((mes, idx) => {
-      const mesVendas = vendasArr.filter(v => new Date(v.created_at).getMonth() === idx).reduce((s, v) => s + (v.valor_total || 0), 0);
-      const mesOrc = orcArr.filter(o => new Date(o.created_at).getMonth() === idx).reduce((s, o) => s + (o.valor_total || 0), 0);
-      return { mes, valor: mesVendas + mesOrc };
+    const monthTotals: Record<number, number> = {};
+    (yearVendas.data ?? []).forEach((v: { valor_final: number; data_venda: string }) => {
+      const m = new Date(v.data_venda).getMonth();
+      monthTotals[m] = (monthTotals[m] || 0) + (v.valor_final || 0);
+    });
+    (yearOrc.data ?? []).forEach((o: { valor_total: number; created_at: string }) => {
+      const m = new Date(o.created_at).getMonth();
+      monthTotals[m] = (monthTotals[m] || 0) + (o.valor_total || 0);
     });
 
-    const vendasRecentes = vendasArr.slice(0, 10).map(v => ({
-      id: v.id,
-      cliente_nome: (v.cliente as { nome: string } | null)?.nome || "—",
-      valor: v.valor_total,
-      data: v.created_at,
-      tipo: "Venda",
+    const chartData = Array.from({ length: 12 }, (_, i) => ({
+      month: MONTHS[i].slice(0, 3),
+      total: monthTotals[i] || 0,
     }));
 
-    setData({
-      receita_mensal: receitaMensal,
-      ticket_medio: ticketMedio,
-      receita_anual: receitaTotal,
-      custos: 0,
-      lucro: receitaTotal,
-      vendas_recentes: vendasRecentes,
-      receita_por_mes: receitaPorMes,
-    });
+    setMonthlyData(chartData);
     setLoading(false);
+  }, [selectedMonth, selectedYear]);
+
+  useEffect(() => {
+    loadFinanceiro();
+  }, [loadFinanceiro]);
+
+  const receitaVendas = vendas.reduce((acc, v) => acc + (v.valor_final || 0), 0);
+  const receitaMensal = receitaVendas + servicosReceita;
+  const totalTransacoes = vendas.length;
+  const ticketMedio = totalTransacoes > 0 ? receitaVendas / totalTransacoes : 0;
+  const receitaAnual = monthlyData.reduce((acc, m) => acc + m.total, 0);
+  const descontosMensal = vendas.reduce((acc, v) => acc + (v.valor_desconto || 0), 0);
+  const custos = receitaMensal * 0.6;
+  const lucro = receitaMensal - custos;
+
+  const maxChartValue = Math.max(...monthlyData.map((m) => m.total), 1);
+
+  function formatCurrency(value: number) {
+    return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   }
 
-  const maxVal = data ? Math.max(...data.receita_por_mes.map(r => r.valor), 1) : 1;
+  function formatDate(dateStr: string | null) {
+    if (!dateStr) return "---";
+    try {
+      return new Date(dateStr).toLocaleDateString("pt-BR");
+    } catch {
+      return dateStr;
+    }
+  }
 
-  const cards = [
-    { title: "Receita Mensal", value: data?.receita_mensal, icon: DollarSign, color: "text-emerald-600" },
-    { title: "Ticket Médio", value: data?.ticket_medio, icon: TrendingUp, color: "text-blue-600" },
-    { title: "Receita Anual", value: data?.receita_anual, icon: BarChart3, color: "text-violet-600" },
-    { title: "Lucro", value: data?.lucro, icon: TrendingUp, color: "text-green-600" },
-  ];
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 5 }, (_, i) => String(currentYear - i));
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-48" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-28" />
+          ))}
+        </div>
+        <Skeleton className="h-64" />
+        <Skeleton className="h-96" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Financeiro</h1>
-          <p className="text-muted-foreground">Visão geral financeira</p>
+          <h1 className="text-2xl font-bold tracking-tight">Financeiro</h1>
+          <p className="text-muted-foreground">
+            Visao geral das financas da empresa.
+          </p>
         </div>
-        <Select value={ano} onValueChange={setAno}>
-          <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {[2024, 2025, 2026, 2027].map(a => <SelectItem key={a} value={a.toString()}>{a}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+            <SelectTrigger className="w-36">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {MONTHS.map((name, i) => (
+                <SelectItem key={i} value={String(i + 1)}>{name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={selectedYear} onValueChange={setSelectedYear}>
+            <SelectTrigger className="w-24">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {years.map((y) => (
+                <SelectItem key={y} value={y}>{y}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {cards.map(c => (
-          <Card key={c.title}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{c.title}</CardTitle>
-              <c.icon className={`h-5 w-5 ${c.color}`} />
-            </CardHeader>
-            <CardContent>
-              {loading ? <Skeleton className="h-8 w-24" /> : (
-                <p className="text-2xl font-bold">
-                  R$ {(c.value || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm text-muted-foreground">Receita Mensal</p>
+              <DollarSign className="h-4 w-4 text-emerald-500" />
+            </div>
+            <p className="text-2xl font-bold text-emerald-600">{formatCurrency(receitaMensal)}</p>
+            <p className="text-xs text-muted-foreground mt-1">{totalTransacoes} vendas + servicos</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm text-muted-foreground">Ticket Medio</p>
+              <Target className="h-4 w-4 text-blue-500" />
+            </div>
+            <p className="text-2xl font-bold text-blue-600">{formatCurrency(ticketMedio)}</p>
+            <p className="text-xs text-muted-foreground mt-1">por venda</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm text-muted-foreground">Receita Anual</p>
+              <TrendingUp className="h-4 w-4 text-violet-500" />
+            </div>
+            <p className="text-2xl font-bold text-violet-600">{formatCurrency(receitaAnual)}</p>
+            <p className="text-xs text-muted-foreground mt-1">{selectedYear}</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm text-muted-foreground">Custos Est.</p>
+              <TrendingDown className="h-4 w-4 text-orange-500" />
+            </div>
+            <p className="text-2xl font-bold text-orange-600">{formatCurrency(custos)}</p>
+            <p className="text-xs text-muted-foreground mt-1">~60% da receita</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm text-muted-foreground">Lucro Est.</p>
+              <BarChart3 className="h-4 w-4 text-green-500" />
+            </div>
+            <p className="text-2xl font-bold text-green-600">{formatCurrency(lucro)}</p>
+            <p className="text-xs text-muted-foreground mt-1">~40% margem</p>
+          </CardContent>
+        </Card>
       </div>
 
+      {/* Bar Chart */}
       <Card>
-        <CardHeader><CardTitle>Receita por Mês</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5" />
+            Receita Mensal - {selectedYear}
+          </CardTitle>
+        </CardHeader>
         <CardContent>
-          {loading ? <Skeleton className="h-48 w-full" /> : (
-            <div className="flex items-end gap-2 h-48">
-              {data?.receita_por_mes.map(r => (
-                <div key={r.mes} className="flex-1 flex flex-col items-center gap-1">
-                  <span className="text-xs text-muted-foreground">
-                    {r.valor > 0 ? `R$ ${(r.valor / 1000).toFixed(0)}k` : ""}
+          <div className="flex items-end gap-2 h-48">
+            {monthlyData.map((data, i) => {
+              const height = maxChartValue > 0 ? (data.total / maxChartValue) * 100 : 0;
+              const isCurrentMonth = i + 1 === parseInt(selectedMonth);
+              return (
+                <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                  <span className="text-xs text-muted-foreground font-mono">
+                    {data.total > 0 ? `${(data.total / 1000).toFixed(0)}k` : ""}
                   </span>
                   <div
-                    className="w-full bg-primary/80 rounded-t-sm min-h-[4px] transition-all"
-                    style={{ height: `${Math.max((r.valor / maxVal) * 100, 2)}%` }}
+                    className={`w-full rounded-t-md transition-all ${
+                      isCurrentMonth
+                        ? "bg-primary"
+                        : data.total > 0
+                        ? "bg-primary/30"
+                        : "bg-muted"
+                    }`}
+                    style={{ height: `${Math.max(height, 2)}%` }}
+                    title={`${MONTHS[i]}: ${formatCurrency(data.total)}`}
                   />
-                  <span className="text-xs text-muted-foreground">{r.mes}</span>
+                  <span className={`text-xs ${isCurrentMonth ? "font-bold text-primary" : "text-muted-foreground"}`}>
+                    {data.month}
+                  </span>
                 </div>
-              ))}
-            </div>
-          )}
+              );
+            })}
+          </div>
         </CardContent>
       </Card>
 
+      {/* Transactions Table */}
       <Card>
-        <CardHeader><CardTitle>Transações Recentes</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Receipt className="h-5 w-5" />
+            Transacoes - {MONTHS[parseInt(selectedMonth) - 1]} {selectedYear}
+          </CardTitle>
+        </CardHeader>
         <CardContent>
-          {loading ? <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div> : (
+          {vendas.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              Nenhuma transacao encontrada neste periodo.
+            </p>
+          ) : (
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Numero</TableHead>
                   <TableHead>Cliente</TableHead>
-                  <TableHead>Tipo</TableHead>
+                  <TableHead>Scooter</TableHead>
+                  <TableHead>Vendedor</TableHead>
                   <TableHead>Valor</TableHead>
+                  <TableHead>Desconto</TableHead>
+                  <TableHead>Final</TableHead>
+                  <TableHead>Pagamento</TableHead>
                   <TableHead>Data</TableHead>
+                  <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data?.vendas_recentes.length === 0 ? (
-                  <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Nenhuma transação</TableCell></TableRow>
-                ) : data?.vendas_recentes.map(v => (
-                  <TableRow key={v.id}>
-                    <TableCell className="font-medium">{v.cliente_nome}</TableCell>
-                    <TableCell>{v.tipo}</TableCell>
-                    <TableCell>R$ {v.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</TableCell>
-                    <TableCell>{new Date(v.data).toLocaleDateString("pt-BR")}</TableCell>
+                {vendas.map((venda) => (
+                  <TableRow key={venda.id}>
+                    <TableCell className="font-mono text-xs">{venda.numero}</TableCell>
+                    <TableCell className="font-medium">{venda.cliente?.nome ?? "---"}</TableCell>
+                    <TableCell>{venda.scooter?.modelo ?? "---"}</TableCell>
+                    <TableCell className="text-sm">{venda.vendedor?.nome ?? "---"}</TableCell>
+                    <TableCell>{formatCurrency(venda.valor)}</TableCell>
+                    <TableCell className="text-orange-600">
+                      {venda.valor_desconto > 0 ? `-${formatCurrency(venda.valor_desconto)}` : "---"}
+                    </TableCell>
+                    <TableCell className="font-bold text-green-700">
+                      {formatCurrency(venda.valor_final)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="text-xs capitalize">
+                        {venda.forma_pagamento?.replace("_", " ") ?? "---"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{formatDate(venda.data_venda)}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="secondary"
+                        className={
+                          venda.status === "concluida"
+                            ? "bg-green-100 text-green-800"
+                            : venda.status === "cancelada"
+                            ? "bg-red-100 text-red-800"
+                            : "bg-yellow-100 text-yellow-800"
+                        }
+                      >
+                        {venda.status}
+                      </Badge>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

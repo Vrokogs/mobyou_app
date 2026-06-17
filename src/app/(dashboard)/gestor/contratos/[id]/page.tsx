@@ -63,8 +63,8 @@ export default function ContratoDetailPage() {
   const loadContrato = useCallback(async () => {
     const supabase = createClient();
 
-    const { data: contratoData } = await supabase
-      .from("contratos")
+    const { data: contratoData } = await (supabase
+      .from("contratos") as any)
       .select("*")
       .eq("id", contratoId)
       .single();
@@ -75,16 +75,16 @@ export default function ContratoDetailPage() {
     }
 
     setContrato(contratoData as Contrato);
-    setEditedContent(contratoData.conteudo || "");
+    setEditedContent((contratoData as any).conteudo || "");
 
     // Load related data
     const [clienteRes, scooterRes, assinaturasRes] = await Promise.all([
-      supabase.from("profiles").select("*").eq("id", contratoData.cliente_id).single(),
-      contratoData.scooter_id
-        ? supabase.from("scooters").select("*").eq("id", contratoData.scooter_id).single()
+      (supabase.from("profiles") as any).select("*").eq("id", (contratoData as any).cliente_id).single(),
+      (contratoData as any).scooter_id
+        ? (supabase.from("scooters") as any).select("*").eq("id", (contratoData as any).scooter_id).single()
         : Promise.resolve({ data: null }),
-      supabase
-        .from("assinaturas")
+      (supabase
+        .from("assinaturas") as any)
         .select("*, signatario:profiles!signatario_id(nome)")
         .eq("contrato_id", contratoId)
         .order("created_at"),
@@ -105,8 +105,8 @@ export default function ContratoDetailPage() {
     setSaving(true);
     const supabase = createClient();
 
-    const { error } = await supabase
-      .from("contratos")
+    const { error } = await (supabase
+      .from("contratos") as any)
       .update({ conteudo: editedContent })
       .eq("id", contrato.id);
 

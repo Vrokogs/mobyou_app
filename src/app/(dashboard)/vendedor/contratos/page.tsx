@@ -79,7 +79,7 @@ export default function VendedorContratosPage() {
     }
 
     const { data: contratosData } = await query;
-    setContratos((contratosData ?? []) as ContratoWithRelations[]);
+    setContratos((contratosData ?? []) as unknown as ContratoWithRelations[]);
 
     // Load templates, clients, scooters
     const [modelosRes, clientesRes, scootersRes] = await Promise.all([

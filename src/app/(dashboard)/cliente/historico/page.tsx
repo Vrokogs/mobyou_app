@@ -40,7 +40,7 @@ export default function ClienteHistoricoPage() {
         .eq("cliente_id", user.id)
         .order("created_at", { ascending: false });
 
-      if (data) setOrdens(data as OrdemHistorico[]);
+      if (data) setOrdens(data as unknown as OrdemHistorico[]);
       setLoading(false);
     }
     load();

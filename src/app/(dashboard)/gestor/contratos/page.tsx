@@ -26,7 +26,7 @@ import { CONTRATO_TIPOS, CONTRATO_STATUS } from "@/lib/constants";
 import type { Contrato, ContratoTipo, ContratoStatus, ModeloContrato, Profile, Scooter } from "@/types/database";
 
 interface ContratoWithRelations extends Contrato {
-  cliente?: { nome: string } | null;
+  cliente?: { nome: string; cpf: string | null } | null;
   scooter?: { modelo: string; chassi: string | null } | null;
 }
 
@@ -75,20 +75,30 @@ export default function ContratosPage() {
     const supabase = createClient();
     let query = supabase
       .from("contratos")
-      .select("*, cliente:profiles!cliente_id(nome), scooter:scooters!scooter_id(modelo, chassi)")
+      .select("*, cliente:profiles!cliente_id(nome, cpf), scooter:scooters!scooter_id(modelo, chassi)")
       .order("created_at", { ascending: false });
 
     if (tipoFilter !== "todos") {
-      query = query.eq("tipo", tipoFilter);
-    }
-
-    if (search.trim()) {
-      query = query.or(`titulo.ilike.%${search}%,numero.ilike.%${search}%`);
+      query = query.eq("tipo", tipoFilter as ContratoTipo);
     }
 
     const { data } = await query;
-    setContratos((data ?? []) as ContratoWithRelations[]);
-  }, [tipoFilter, search]);
+    setContratos((data ?? []) as unknown as ContratoWithRelations[]);
+  }, [tipoFilter]);
+
+  // Busca por nome do cliente ou CPF (no cliente, sem recarregar)
+  const filteredContratos = contratos.filter((c) => {
+    const termo = search.trim().toLowerCase();
+    if (!termo) return true;
+    const nome = c.cliente?.nome?.toLowerCase() ?? "";
+    const cpf = (c.cliente?.cpf ?? "").replace(/\D/g, "");
+    const termoCpf = termo.replace(/\D/g, "");
+    return (
+      nome.includes(termo) ||
+      (termoCpf.length > 0 && cpf.includes(termoCpf)) ||
+      c.titulo.toLowerCase().includes(termo)
+    );
+  });
 
   const loadModelos = useCallback(async () => {
     const supabase = createClient();
@@ -184,7 +194,7 @@ export default function ContratosPage() {
       const numero = `CTR-${Date.now().toString(36).toUpperCase()}`;
       const titulo = newContrato.titulo || `${CONTRATO_TIPOS[newContrato.tipo as ContratoTipo]} - ${clientes.find((c) => c.id === newContrato.cliente_id)?.nome || ""}`;
 
-      const { error } = await supabase.from("contratos").insert({
+      const { error } = await (supabase.from("contratos") as any).insert({
         tipo: newContrato.tipo as ContratoTipo,
         titulo,
         conteudo,
@@ -344,7 +354,7 @@ export default function ContratosPage() {
               <div className="flex items-center gap-2 max-w-sm flex-1">
                 <Search className="h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar por titulo ou numero..."
+                  placeholder="Buscar por nome ou CPF do cliente..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -369,7 +379,7 @@ export default function ContratosPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {contratos.length === 0 ? (
+                {filteredContratos.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-8">
                     Nenhum contrato encontrado.
                   </p>
@@ -386,7 +396,7 @@ export default function ContratosPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {contratos.map((contrato) => (
+                      {filteredContratos.map((contrato) => (
                         <TableRow key={contrato.id}>
                           <TableCell className="font-medium">
                             {contrato.titulo}

@@ -54,7 +54,7 @@ export default function TecnicoDashboardPage() {
         .in("status", ["recebido", "checkin_realizado", "em_analise", "diagnostico_concluido", "aguardando_inicio", "em_servico", "testes_finais"])
         .order("created_at", { ascending: false });
 
-      if (data) setOrdens(data as OrdemResumo[]);
+      if (data) setOrdens(data as unknown as OrdemResumo[]);
       setLoading(false);
     }
     load();

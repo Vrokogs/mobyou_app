@@ -45,17 +45,44 @@ export default function ChassiPage() {
   const [result, setResult] = useState<ChassiResult | null>(null);
 
   async function handleSearch() {
-    if (!chassi.trim()) return;
+    const term = chassi.trim();
+    if (!term) return;
 
     setLoading(true);
     setSearched(true);
     const supabase = createClient();
 
-    const { data: scooterData } = await supabase
-      .from("scooters")
-      .select("*")
-      .eq("chassi", chassi.trim())
-      .single();
+    let scooterData: Scooter | null = null;
+
+    const digits = term.replace(/\D/g, "");
+    const isCpf = digits.length === 11;
+
+    if (isCpf) {
+      // Busca pelo CPF do cliente -> scooter(s) vinculada(s)
+      const formatted = `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id")
+        .in("cpf", [digits, formatted])
+        .limit(1);
+      const clienteId = (profs?.[0] as { id: string } | undefined)?.id;
+      if (clienteId) {
+        const { data: scts } = await supabase
+          .from("scooters")
+          .select("*")
+          .eq("cliente_id", clienteId)
+          .order("created_at", { ascending: false });
+        scooterData = (scts?.[0] as unknown as Scooter) ?? null;
+      }
+    } else {
+      // Busca pelo chassi
+      const { data } = await supabase
+        .from("scooters")
+        .select("*")
+        .eq("chassi", term)
+        .maybeSingle();
+      scooterData = (data as unknown as Scooter) ?? null;
+    }
 
     if (!scooterData) {
       setResult({ scooter: null, cliente: null, garantias: [], ordens: [], certificados: [] });
@@ -63,7 +90,7 @@ export default function ChassiPage() {
       return;
     }
 
-    const scooter = scooterData as Scooter;
+    const scooter = scooterData;
 
     const promises: Promise<unknown>[] = [
       supabase
@@ -123,9 +150,9 @@ export default function ChassiPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Consulta por Chassi</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Consulta por Chassi ou CPF</h1>
         <p className="text-muted-foreground">
-          Pesquise pelo numero do chassi para visualizar todas as informacoes vinculadas.
+          Pesquise pelo numero do chassi ou pelo CPF do cliente para visualizar a moto e todas as informacoes vinculadas.
         </p>
       </div>
 
@@ -135,7 +162,7 @@ export default function ChassiPage() {
             <div className="relative flex-1">
               <Hash className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Digite o numero do chassi..."
+                placeholder="Digite o chassi ou o CPF do cliente..."
                 value={chassi}
                 onChange={(e) => setChassi(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -171,9 +198,9 @@ export default function ChassiPage() {
               <div className="rounded-full bg-muted p-4 mb-4">
                 <AlertCircle className="h-8 w-8 text-muted-foreground" />
               </div>
-              <h3 className="font-semibold text-lg mb-1">Chassi nao encontrado</h3>
+              <h3 className="font-semibold text-lg mb-1">Nenhum resultado encontrado</h3>
               <p className="text-sm text-muted-foreground">
-                Nenhuma scooter foi encontrada com o chassi &quot;{chassi}&quot;.
+                Nenhuma moto foi encontrada para &quot;{chassi}&quot; (chassi ou CPF).
               </p>
             </div>
           </CardContent>

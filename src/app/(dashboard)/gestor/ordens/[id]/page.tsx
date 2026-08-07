@@ -37,6 +37,7 @@ import {
   ORDER_STATUS_LABELS,
   ORDER_STATUS_COLORS,
   FOTO_TIPOS,
+  FOTO_ETAPAS,
 } from "@/lib/constants";
 import { StatusStepper } from "@/components/ordens/status-stepper";
 import { TimelineView } from "@/components/timeline/timeline-view";
@@ -79,6 +80,7 @@ import {
   RefreshCw,
   Play,
   Eye,
+  Save,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -283,6 +285,13 @@ export default function OrdemDetalhePage() {
   const [checkinItems, setCheckinItems] = useState<CheckinItem[]>([]);
   const [fotos, setFotos] = useState<FotoOrdem[]>([]);
   const [diagnostico, setDiagnostico] = useState<Diagnostico | null>(null);
+  const [diagForm, setDiagForm] = useState({
+    problemas: "",
+    pecas: "",
+    servicos: "",
+    observacoes: "",
+  });
+  const [savingDiag, setSavingDiag] = useState(false);
   const [orcamento, setOrcamento] = useState<Orcamento | null>(null);
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [tecnicos, setTecnicos] = useState<Pick<Profile, "id" | "nome">[]>([]);
@@ -294,7 +303,6 @@ export default function OrdemDetalhePage() {
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedTecnico, setSelectedTecnico] = useState("");
   const [assigningTecnico, setAssigningTecnico] = useState(false);
-  const [selectedFotoTipo, setSelectedFotoTipo] = useState("checkin_frente");
 
   const fetchOrdem = useCallback(async () => {
     try {
@@ -313,7 +321,7 @@ export default function OrdemDetalhePage() {
         .single();
 
       if (error) throw error;
-      setOrdem(data as OrdemDetail);
+      setOrdem(data as unknown as OrdemDetail);
     } catch (err) {
       console.error("Erro ao carregar OS:", err);
       toast.error("Erro ao carregar ordem de servico");
@@ -353,6 +361,15 @@ export default function OrdemDetalhePage() {
       setCheckinItems(checkin.data || []);
       setFotos(fotosRes.data || []);
       setDiagnostico(diagRes.data);
+      const diag = diagRes.data as Diagnostico | null;
+      const toLines = (v: unknown) =>
+        Array.isArray(v) ? v.join("\n") : typeof v === "string" ? v : "";
+      setDiagForm({
+        problemas: diag?.problemas_encontrados ?? "",
+        pecas: toLines(diag?.pecas_necessarias),
+        servicos: toLines(diag?.servicos_necessarios),
+        observacoes: diag?.observacoes ?? "",
+      });
       setOrcamento(orcRes.data);
     } catch (err) {
       console.error("Erro ao carregar dados:", err);
@@ -503,7 +520,10 @@ export default function OrdemDetalhePage() {
     }
   }
 
-  async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handlePhotoUpload(
+    e: React.ChangeEvent<HTMLInputElement>,
+    tipo: string
+  ) {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -527,7 +547,7 @@ export default function OrdemDetalhePage() {
         .from("fotos_ordem") as any)
         .insert({
           ordem_id: orderId,
-          tipo: selectedFotoTipo,
+          tipo,
           url: publicUrl,
           descricao: null,
         });
@@ -540,7 +560,7 @@ export default function OrdemDetalhePage() {
         responsavel_id: user?.id || null,
         tipo: "foto",
         titulo: "Foto adicionada",
-        descricao: `Foto do tipo "${FOTO_TIPOS.find((t) => t.value === selectedFotoTipo)?.label}" adicionada`,
+        descricao: `Foto do tipo "${FOTO_TIPOS.find((t) => t.value === tipo)?.label ?? tipo}" adicionada`,
       });
 
       toast.success("Foto enviada com sucesso");
@@ -552,6 +572,58 @@ export default function OrdemDetalhePage() {
     } finally {
       setUploadingPhoto(false);
       e.target.value = "";
+    }
+  }
+
+  async function handleSaveDiagnostico() {
+    setSavingDiag(true);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const toArray = (v: string) =>
+        v
+          .split("\n")
+          .map((s) => s.trim())
+          .filter(Boolean);
+
+      const payload = {
+        ordem_id: orderId,
+        tecnico_id: user?.id,
+        problemas_encontrados: diagForm.problemas || null,
+        pecas_necessarias: toArray(diagForm.pecas),
+        servicos_necessarios: toArray(diagForm.servicos),
+        observacoes: diagForm.observacoes || null,
+      };
+
+      if (diagnostico) {
+        const { error } = await (supabase.from("diagnosticos") as any)
+          .update(payload)
+          .eq("id", diagnostico.id);
+        if (error) throw error;
+      } else {
+        const { error } = await (supabase.from("diagnosticos") as any).insert(
+          payload
+        );
+        if (error) throw error;
+      }
+
+      await (supabase.from("timeline_eventos") as any).insert({
+        ordem_id: orderId,
+        responsavel_id: user?.id || null,
+        tipo: "diagnostico",
+        titulo: diagnostico ? "Diagnostico atualizado" : "Diagnostico registrado",
+        descricao: "Diagnostico preenchido pelo gestor",
+      });
+
+      toast.success("Diagnostico salvo com sucesso");
+      await fetchRelatedData();
+      fetchTimeline();
+    } catch (err) {
+      console.error("Erro ao salvar diagnostico:", err);
+      toast.error("Erro ao salvar diagnostico");
+    } finally {
+      setSavingDiag(false);
     }
   }
 
@@ -596,10 +668,8 @@ export default function OrdemDetalhePage() {
   }
 
   const currentActions = STATUS_ACTIONS[ordem.status] || [];
-  const fotosByType = FOTO_TIPOS.map((tipo) => ({
-    ...tipo,
-    fotos: fotos.filter((f) => f.tipo === tipo.value),
-  })).filter((t) => t.fotos.length > 0);
+  const fotosReadOnly =
+    ordem.status === "entregue" || ordem.status === "cancelado";
 
   return (
     <div className="space-y-6">
@@ -803,8 +873,8 @@ export default function OrdemDetalhePage() {
                 orderId={orderId}
                 existingData={checkinItems}
                 readOnly={
-                  ordem.status !== "recebido" &&
-                  ordem.status !== "checkin_realizado"
+                  ordem.status === "entregue" ||
+                  ordem.status === "cancelado"
                 }
                 onSubmit={async () => {
                   await fetchRelatedData();
@@ -814,69 +884,69 @@ export default function OrdemDetalhePage() {
             </CardContent>
           </Card>
 
-          {/* Fotos Section */}
+          {/* Fotos Section - Check-in fotografico em 3 etapas */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Camera className="h-4 w-4" />
-                Fotos
+                Fotos do Check-in
               </CardTitle>
-              <CardAction>
-                <div className="flex items-center gap-2">
-                  <Select
-                    value={selectedFotoTipo}
-                    onValueChange={(val) => val && setSelectedFotoTipo(val)}
-                  >
-                    <SelectTrigger className="h-7 text-xs w-[160px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {FOTO_TIPOS.map((tipo) => (
-                        <SelectItem key={tipo.value} value={tipo.value}>
-                          {tipo.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="relative">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      onChange={handlePhotoUpload}
-                      disabled={uploadingPhoto}
-                    />
-                    <Button
-                      variant="outline"
-                      size="xs"
-                      disabled={uploadingPhoto}
-                    >
-                      {uploadingPhoto ? (
-                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                      ) : (
-                        <Upload className="h-3 w-3 mr-1" />
-                      )}
-                      Enviar
-                    </Button>
-                  </div>
-                </div>
-              </CardAction>
             </CardHeader>
-            <CardContent>
-              {fotos.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                  <Camera className="h-8 w-8 mb-2 opacity-40" />
-                  <p className="text-sm">Nenhuma foto adicionada</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {fotosByType.map((grupo) => (
-                    <div key={grupo.value}>
-                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                        {grupo.label}
-                      </h4>
+            <CardContent className="space-y-4">
+              {FOTO_ETAPAS.map((etapa, idx) => {
+                const etapaTipos = etapa.tipos.map((t) => t.value as string);
+                const etapaFotos = fotos.filter((f) =>
+                  etapaTipos.includes(f.tipo)
+                );
+                return (
+                  <div key={etapa.grupo} className="rounded-lg border p-3">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-2">
+                      <div>
+                        <h4 className="text-sm font-semibold flex items-center gap-2">
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary text-[11px] font-bold">
+                            {idx + 1}
+                          </span>
+                          {etapa.titulo}
+                        </h4>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {etapa.descricao}
+                        </p>
+                      </div>
+                      {!fotosReadOnly && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {etapa.tipos.map((t) => (
+                            <div key={t.value} className="relative">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                onChange={(e) => handlePhotoUpload(e, t.value)}
+                                disabled={uploadingPhoto}
+                              />
+                              <Button
+                                variant="outline"
+                                size="xs"
+                                disabled={uploadingPhoto}
+                              >
+                                {uploadingPhoto ? (
+                                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                ) : (
+                                  <Upload className="h-3 w-3 mr-1" />
+                                )}
+                                {etapa.tipos.length > 1 ? t.label : "Enviar foto"}
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {etapaFotos.length === 0 ? (
+                      <p className="text-xs text-muted-foreground py-2">
+                        Nenhuma foto nesta etapa.
+                      </p>
+                    ) : (
                       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-                        {grupo.fotos.map((foto) => (
+                        {etapaFotos.map((foto) => (
                           <div
                             key={foto.id}
                             className="aspect-square rounded-lg overflow-hidden border bg-muted cursor-pointer hover:ring-2 hover:ring-primary transition-all"
@@ -884,88 +954,133 @@ export default function OrdemDetalhePage() {
                           >
                             <img
                               src={foto.url}
-                              alt={grupo.label}
+                              alt={etapa.titulo}
                               className="h-full w-full object-cover"
                             />
                           </div>
                         ))}
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    )}
+                  </div>
+                );
+              })}
             </CardContent>
           </Card>
 
-          {/* Diagnostico Section */}
+          {/* Diagnostico Section - preenchido pelo gestor */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Search className="h-4 w-4" />
                 Diagnostico
               </CardTitle>
+              {diagnostico && (
+                <CardAction>
+                  <Badge variant="secondary" className="bg-green-100 text-green-800">
+                    Registrado
+                  </Badge>
+                </CardAction>
+              )}
             </CardHeader>
             <CardContent>
-              {diagnostico ? (
-                <div className="space-y-4 text-sm">
-                  {diagnostico.problemas_encontrados && (
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">
-                        Problemas Encontrados
-                      </p>
-                      <p>{diagnostico.problemas_encontrados}</p>
-                    </div>
-                  )}
-                  {diagnostico.observacoes && (
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">
-                        Observacoes
-                      </p>
-                      <p>{diagnostico.observacoes}</p>
-                    </div>
-                  )}
-                  {false && (
+              {fotosReadOnly ? (
+                // OS entregue/cancelada: somente leitura
+                diagnostico ? (
+                  <div className="space-y-4 text-sm">
+                    {diagnostico.problemas_encontrados && (
                       <div>
                         <p className="text-xs text-muted-foreground mb-1">
-                          Componentes Afetados
+                          Problemas Encontrados
                         </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {[].map((comp: string, i: number) => (
-                            <Badge key={i} variant="secondary">
-                              {comp}
-                            </Badge>
-                          ))}
-                        </div>
+                        <p className="whitespace-pre-line">
+                          {diagnostico.problemas_encontrados}
+                        </p>
                       </div>
                     )}
-                  {diagnostico.recomendacoes && (
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">
-                        Recomendacoes
-                      </p>
-                      <p>{diagnostico.recomendacoes}</p>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      variant={
-                        diagnostico.coberto_garantia
-                          ? "default"
-                          : "secondary"
-                      }
-                    >
-                      {diagnostico.coberto_garantia
-                        ? "Coberto pela Garantia"
-                        : "Fora da Garantia"}
-                    </Badge>
+                    {diagnostico.observacoes && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">
+                          Observacoes
+                        </p>
+                        <p className="whitespace-pre-line">
+                          {diagnostico.observacoes}
+                        </p>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                  <Search className="h-8 w-8 mb-2 opacity-40" />
-                  <p className="text-sm">
-                    Diagnostico ainda nao realizado
+                ) : (
+                  <p className="text-sm text-muted-foreground py-4 text-center">
+                    Diagnostico nao foi realizado.
                   </p>
+                )
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    Preencha o diagnostico tecnico da scooter.
+                  </p>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Problemas encontrados</Label>
+                    <Textarea
+                      placeholder="Descreva os problemas identificados..."
+                      value={diagForm.problemas}
+                      onChange={(e) =>
+                        setDiagForm((p) => ({ ...p, problemas: e.target.value }))
+                      }
+                      rows={3}
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">
+                        Pecas necessarias (uma por linha)
+                      </Label>
+                      <Textarea
+                        placeholder={"Ex:\nPneu dianteiro\nPastilha de freio"}
+                        value={diagForm.pecas}
+                        onChange={(e) =>
+                          setDiagForm((p) => ({ ...p, pecas: e.target.value }))
+                        }
+                        rows={3}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">
+                        Servicos necessarios (um por linha)
+                      </Label>
+                      <Textarea
+                        placeholder={"Ex:\nTroca de pneu\nRevisao de freios"}
+                        value={diagForm.servicos}
+                        onChange={(e) =>
+                          setDiagForm((p) => ({ ...p, servicos: e.target.value }))
+                        }
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Observacoes</Label>
+                    <Textarea
+                      placeholder="Observacoes gerais..."
+                      value={diagForm.observacoes}
+                      onChange={(e) =>
+                        setDiagForm((p) => ({
+                          ...p,
+                          observacoes: e.target.value,
+                        }))
+                      }
+                      rows={2}
+                    />
+                  </div>
+                  <div className="flex justify-end">
+                    <Button onClick={handleSaveDiagnostico} disabled={savingDiag}>
+                      {savingDiag ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                      ) : (
+                        <Save className="h-4 w-4 mr-1.5" />
+                      )}
+                      {diagnostico ? "Atualizar Diagnostico" : "Salvar Diagnostico"}
+                    </Button>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -982,18 +1097,20 @@ export default function OrdemDetalhePage() {
                 <CardAction>
                   <Badge
                     variant={
-                      orcamento.aprovado === true
+                      orcamento.status === "aprovado"
                         ? "default"
-                        : orcamento.aprovado === false
+                        : orcamento.status === "rejeitado"
                           ? "destructive"
                           : "secondary"
                     }
                   >
-                    {orcamento.aprovado === true
+                    {orcamento.status === "aprovado"
                       ? "Aprovado"
-                      : orcamento.aprovado === false
+                      : orcamento.status === "rejeitado"
                         ? "Rejeitado"
-                        : "Rascunho"}
+                        : orcamento.status === "enviado"
+                          ? "Enviado"
+                          : "Rascunho"}
                   </Badge>
                 </CardAction>
               )}

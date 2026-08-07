@@ -11,49 +11,68 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Upload, FileText, CheckCircle2, Loader2, X,
+  Upload, FileText, CheckCircle2, Loader2, X, Plus, Trash2, Bike,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { NotaFiscal } from "@/types/database";
 
-interface ExtractedData {
-  cliente: {
-    nome: string;
-    cpf: string;
-    telefone: string;
-    email: string;
-    endereco: string;
-  };
-  scooter: {
-    modelo: string;
-    marca: string;
-    cor: string;
-    numero_serie: string;
-    chassi: string;
-    ano: string;
-  };
-  venda: {
-    valor: string;
-    parcelas: string;
-    data_compra: string;
-    numero_nf: string;
-    forma_pagamento: string;
-  };
+interface ClienteData {
+  nome: string;
+  cpf: string;
+  telefone: string;
+  email: string;
+  endereco: string;
+  senha: string;
 }
 
+interface ScooterData {
+  modelo: string;
+  marca: string;
+  cor: string;
+  numero_serie: string;
+  chassi: string;
+  ano: string;
+  valor: string;
+}
+
+interface VendaData {
+  valor: string;
+  parcelas: string;
+  data_compra: string;
+  numero_nf: string;
+  forma_pagamento: string;
+}
+
+interface ExtractedData {
+  cliente: ClienteData;
+  scooters: ScooterData[];
+  venda: VendaData;
+}
+
+const EMPTY_SCOOTER: ScooterData = {
+  modelo: "", marca: "", cor: "", numero_serie: "", chassi: "", ano: "", valor: "",
+};
+
 const EMPTY_DATA: ExtractedData = {
-  cliente: { nome: "", cpf: "", telefone: "", email: "", endereco: "" },
-  scooter: { modelo: "", marca: "", cor: "", numero_serie: "", chassi: "", ano: "" },
+  cliente: { nome: "", cpf: "", telefone: "", email: "", endereco: "", senha: "" },
+  scooters: [{ ...EMPTY_SCOOTER }],
   venda: { valor: "", parcelas: "1", data_compra: new Date().toISOString().slice(0, 10), numero_nf: "", forma_pagamento: "pix" },
 };
+
+function cloneEmpty(): ExtractedData {
+  return JSON.parse(JSON.stringify(EMPTY_DATA));
+}
 
 function parseNFeXml(xmlText: string): ExtractedData {
   const parser = new DOMParser();
   const doc = parser.parseFromString(xmlText, "text/xml");
-  const data: ExtractedData = JSON.parse(JSON.stringify(EMPTY_DATA));
+  const data: ExtractedData = cloneEmpty();
 
   try {
     const dest = doc.querySelector("dest");
@@ -75,14 +94,23 @@ function parseNFeXml(xmlText: string): ExtractedData {
       }
     }
 
-    const det = doc.querySelector("det");
-    if (det) {
+    // Produtos (scooters) - one per <det>
+    const dets = Array.from(doc.querySelectorAll("det"));
+    const scooters: ScooterData[] = [];
+    for (const det of dets) {
       const prod = det.querySelector("prod");
-      if (prod) {
-        data.scooter.modelo = prod.querySelector("xProd")?.textContent || "";
-        data.venda.valor = prod.querySelector("vProd")?.textContent || "";
-      }
+      if (!prod) continue;
+      const scooter: ScooterData = { ...EMPTY_SCOOTER };
+      scooter.modelo = prod.querySelector("xProd")?.textContent || "";
+      scooter.valor = prod.querySelector("vProd")?.textContent || "";
+      const infAd = det.querySelector("infAdProd")?.textContent || "";
+      const chassiMatch = infAd.match(/chassi[:\s]*([A-Z0-9]+)/i);
+      if (chassiMatch) scooter.chassi = chassiMatch[1];
+      const serieMatch = infAd.match(/s[eé]rie[:\s]*([A-Z0-9]+)/i);
+      if (serieMatch) scooter.numero_serie = serieMatch[1];
+      scooters.push(scooter);
     }
+    if (scooters.length > 0) data.scooters = scooters;
 
     const ide = doc.querySelector("ide");
     if (ide) {
@@ -107,6 +135,7 @@ export default function VendedorImportarNFPage() {
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
   const [fileName, setFileName] = useState<string>("");
   const [fileType, setFileType] = useState<string>("");
+  const [file, setFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
   const [imported, setImported] = useState(false);
   const [historico, setHistorico] = useState<(NotaFiscal & { cliente?: { nome: string } | null })[]>([]);
@@ -122,7 +151,7 @@ export default function VendedorImportarNFPage() {
       .select("*, cliente:profiles!cliente_id(nome)")
       .order("created_at", { ascending: false })
       .limit(50);
-    setHistorico((data ?? []) as (NotaFiscal & { cliente?: { nome: string } | null })[]);
+    setHistorico((data ?? []) as unknown as (NotaFiscal & { cliente?: { nome: string } | null })[]);
     setLoading(false);
   }, []);
 
@@ -135,6 +164,7 @@ export default function VendedorImportarNFPage() {
     if (!file) return;
 
     setFileName(file.name);
+    setFile(file);
     setImported(false);
 
     const ext = file.name.split(".").pop()?.toLowerCase();
@@ -144,14 +174,42 @@ export default function VendedorImportarNFPage() {
       const text = await file.text();
       const data = parseNFeXml(text);
       setExtractedData(data);
-      toast.success("Dados extraidos do XML!");
+      toast.success(
+        data.scooters.length > 1
+          ? `Dados extraidos! ${data.scooters.length} scooters encontradas.`
+          : "Dados extraidos do XML!"
+      );
     } else if (ext === "pdf") {
       setFileType("pdf");
-      setExtractedData(JSON.parse(JSON.stringify(EMPTY_DATA)));
-      toast.info("PDF carregado. Preencha os dados manualmente.");
+      setExtractedData(cloneEmpty());
+      toast.info("Lendo o PDF...");
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        const r = await fetch("/api/extrair-nf", { method: "POST", body: fd });
+        const j = await r.json();
+        if (r.ok && j.encontrouAlgo) {
+          const base = cloneEmpty();
+          const d = j.data;
+          const onlyFilled = (obj: Record<string, unknown>) =>
+            Object.fromEntries(Object.entries(obj).filter(([, v]) => v));
+          setExtractedData({
+            cliente: { ...base.cliente, ...onlyFilled(d.cliente) },
+            scooters: d.scooters?.[0]?.modelo
+              ? d.scooters.map((s: Record<string, unknown>) => ({ ...base.scooters[0], ...onlyFilled(s) }))
+              : base.scooters,
+            venda: { ...base.venda, ...onlyFilled(d.venda) },
+          });
+          toast.success("Dados extraidos do PDF! Confira e complete o que faltar.");
+        } else {
+          toast.info("PDF carregado, mas nao consegui extrair. Preencha manualmente ou use o XML.");
+        }
+      } catch {
+        toast.info("PDF carregado. Preencha os dados manualmente.");
+      }
     } else if (["jpg", "jpeg", "png", "webp"].includes(ext || "")) {
       setFileType("image");
-      setExtractedData(JSON.parse(JSON.stringify(EMPTY_DATA)));
+      setExtractedData(cloneEmpty());
       toast.info("Imagem carregada. Preencha os dados manualmente.");
     } else {
       toast.error("Formato nao suportado. Use XML, PDF ou imagem.");
@@ -169,20 +227,58 @@ export default function VendedorImportarNFPage() {
     maxFiles: 1,
   });
 
-  function updateData(section: keyof ExtractedData, field: string, value: string) {
-    if (!extractedData) return;
-    setExtractedData({
-      ...extractedData,
-      [section]: { ...extractedData[section], [field]: value },
+  function updateCliente(field: keyof ClienteData, value: string) {
+    setExtractedData((prev) =>
+      prev ? { ...prev, cliente: { ...prev.cliente, [field]: value } } : prev
+    );
+  }
+
+  function updateVenda(field: keyof VendaData, value: string) {
+    setExtractedData((prev) =>
+      prev ? { ...prev, venda: { ...prev.venda, [field]: value } } : prev
+    );
+  }
+
+  function updateScooter(index: number, field: keyof ScooterData, value: string) {
+    setExtractedData((prev) => {
+      if (!prev) return prev;
+      const scooters = prev.scooters.map((s, i) =>
+        i === index ? { ...s, [field]: value } : s
+      );
+      return { ...prev, scooters };
+    });
+  }
+
+  function addScooter() {
+    setExtractedData((prev) =>
+      prev ? { ...prev, scooters: [...prev.scooters, { ...EMPTY_SCOOTER }] } : prev
+    );
+  }
+
+  function removeScooter(index: number) {
+    setExtractedData((prev) => {
+      if (!prev) return prev;
+      if (prev.scooters.length <= 1) return prev;
+      return { ...prev, scooters: prev.scooters.filter((_, i) => i !== index) };
     });
   }
 
   async function handleImportar() {
     if (!extractedData) return;
-    const { cliente, scooter, venda } = extractedData;
+    const { cliente, scooters, venda } = extractedData;
 
     if (!cliente.nome || !cliente.cpf) {
       toast.error("Nome e CPF do cliente sao obrigatorios");
+      return;
+    }
+    if (!cliente.email) {
+      toast.error("Informe o e-mail do cliente para criar a conta de acesso.");
+      return;
+    }
+
+    const validScooters = scooters.filter((s) => s.modelo || s.chassi || s.numero_serie);
+    if (validScooters.length === 0) {
+      toast.error("Informe ao menos uma scooter (modelo ou chassi)");
       return;
     }
 
@@ -193,65 +289,85 @@ export default function VendedorImportarNFPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // 1. Create or find cliente
-      const { data: existingCliente } = await (supabase
-        .from("profiles") as any)
-        .select("id")
-        .eq("cpf", cliente.cpf.replace(/\D/g, ""))
-        .single();
-
-      let clienteId: string;
-
-      if (existingCliente) {
-        clienteId = (existingCliente as any).id;
-        await (supabase.from("profiles") as any).update({
+      // 1. Conta de acesso + perfil do cliente (sem duplicar contratos)
+      const resCli = await fetch("/api/criar-cliente", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           nome: cliente.nome,
-          telefone: cliente.telefone || null,
-          email: cliente.email || null,
-          endereco: cliente.endereco || null,
-        }).eq("id", clienteId);
-      } else {
-        clienteId = crypto.randomUUID();
-        const { error: profileError } = await (supabase.from("profiles") as any).insert({
-          id: clienteId,
-          email: cliente.email || `${cliente.cpf.replace(/\D/g, "")}@placeholder.com`,
-          nome: cliente.nome,
-          cpf: cliente.cpf.replace(/\D/g, ""),
-          telefone: cliente.telefone || null,
-          endereco: cliente.endereco || null,
-          role: "cliente" as const,
-          ativo: true,
-          avatar_url: null,
-          cidade: null,
-          estado: null,
-          cep: null,
+          cpf: cliente.cpf,
+          telefone: cliente.telefone,
+          email: cliente.email,
+          endereco: cliente.endereco,
+          senha: cliente.senha,
+          gerarContratos: false,
+        }),
+      });
+      const cJson = await resCli.json();
+      if (!resCli.ok) {
+        toast.error("Erro ao criar cliente", {
+          description: cJson.error || "Verifique o e-mail e os dados do cliente.",
         });
+        setImporting(false);
+        return;
+      }
+      const clienteId: string = cJson.clienteId;
+      if (cJson.senha) {
+        toast.success("Conta do cliente criada!", {
+          description: `Login: ${cJson.email} • Senha: ${cJson.senha}`,
+          duration: 15000,
+        });
+      }
 
-        if (profileError) {
-          toast.error("Erro ao criar cliente", { description: profileError.message });
-          setImporting(false);
-          return;
+      const dataInicio = venda.data_compra || new Date().toISOString().slice(0, 10);
+      const dataFim = new Date(dataInicio);
+      dataFim.setFullYear(dataFim.getFullYear() + 1);
+      const dataFimStr = dataFim.toISOString().slice(0, 10);
+      const parcelas = parseInt(venda.parcelas) || 1;
+
+      // Upload do arquivo da NF (uma vez)
+      let arquivoUrl: string | null = null;
+      let storagePath: string | null = null;
+      if (file) {
+        const fext = file.name.split(".").pop() || "bin";
+        const path = `notas/${clienteId}/${Date.now()}.${fext}`;
+        const { error: upErr } = await supabase.storage
+          .from("documentos")
+          .upload(path, file, { upsert: true });
+        if (!upErr) {
+          storagePath = path;
+          arquivoUrl = supabase.storage.from("documentos").getPublicUrl(path).data.publicUrl;
         }
       }
 
-      // 2. Create scooter
-      let scooterId: string | null = null;
-      if (scooter.modelo || scooter.chassi) {
+      // Registro da NF (uma vez, valor total)
+      const nfTotal = venda.valor
+        ? parseFloat(venda.valor)
+        : validScooters.reduce((sum, s) => sum + (parseFloat(s.valor) || 0), 0);
+      const { data: nfData } = await (supabase.from("notas_fiscais") as any).insert({
+        tipo_arquivo: fileType === "xml" ? "xml" : fileType === "image" ? "imagem" : "pdf",
+        arquivo_url: arquivoUrl || "",
+        storage_path: storagePath || "",
+        dados_extraidos: extractedData as unknown as Record<string, unknown>,
+        importado_por: user.id,
+        cliente_id: clienteId,
+        valor: nfTotal,
+        parcelas,
+        data_compra: venda.data_compra || null,
+      }).select("id").single();
+      const notaFiscalId = (nfData as any)?.id ?? null;
+
+      // 2. Para cada scooter: scooter + garantia + contrato + venda
+      for (const scooter of validScooters) {
         const { data: scooterData, error: scooterError } = await (supabase.from("scooters") as any).insert({
           modelo: scooter.modelo || "Nao informado",
           marca: scooter.marca || "Nao informado",
           cor: scooter.cor || null,
-          numero_serie: scooter.numero_serie || null,
-          chassi: scooter.chassi || null,
+          numero_serie: scooter.numero_serie || `SN-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          chassi: scooter.chassi || `CH-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
           ano: scooter.ano ? parseInt(scooter.ano) : null,
           cliente_id: clienteId,
-          km_atual: 0,
-          status: "ativo",
-          placa: null,
-          motor_numero: null,
-          bateria_numero: null,
-          foto_url: null,
-          observacoes: null,
+          data_compra: dataInicio,
         }).select("id").single();
 
         if (scooterError) {
@@ -259,89 +375,49 @@ export default function VendedorImportarNFPage() {
           setImporting(false);
           return;
         }
-        scooterId = (scooterData as any).id;
-
-        // 3. Garantia
-        const dataInicio = venda.data_compra || new Date().toISOString().slice(0, 10);
-        const dataFim = new Date(dataInicio);
-        dataFim.setFullYear(dataFim.getFullYear() + 1);
+        const scooterId = (scooterData as any).id;
 
         await (supabase.from("garantias") as any).insert({
           scooter_id: scooterId,
           cliente_id: clienteId,
-          tipo: "fabrica",
-          descricao: "Garantia de fabrica - 1 ano",
+          data_compra: dataInicio,
           data_inicio: dataInicio,
-          data_fim: dataFim.toISOString().slice(0, 10),
-          km_limite: null,
+          data_fim: dataFimStr,
           status: "ativa",
-          termos: null,
         });
-      }
 
-      // 4. Create venda record (vendedor context)
-      const vendaNumero = `VND-${Date.now().toString(36).toUpperCase()}`;
-      const vendaValor = venda.valor ? parseFloat(venda.valor) : 0;
-
-      const { data: vendaData } = await (supabase.from("vendas") as any).insert({
-        numero: vendaNumero,
-        cliente_id: clienteId,
-        vendedor_id: user.id,
-        scooter_id: scooterId || "",
-        valor: vendaValor,
-        valor_desconto: 0,
-        valor_final: vendaValor,
-        forma_pagamento: venda.forma_pagamento || "pix",
-        parcelas: parseInt(venda.parcelas) || 1,
-        status: "concluida",
-        observacoes: `Importado da NF ${venda.numero_nf || ""}`,
-        data_venda: venda.data_compra || new Date().toISOString().slice(0, 10),
-      }).select("id").single();
-
-      // 5. Contrato
-      const contratoNumero = `CTR-${Date.now().toString(36).toUpperCase()}`;
-      await (supabase.from("contratos") as any).insert({
-        numero: contratoNumero,
-        tipo: "compra_venda" as const,
-        titulo: `Compra e Venda - ${cliente.nome}`,
-        conteudo: `<h2>Contrato de Compra e Venda</h2>
+        const { data: contratoData } = await (supabase.from("contratos") as any).insert({
+          tipo: "compra_venda" as const,
+          titulo: `Compra e Venda - ${cliente.nome}`,
+          conteudo: `<h2>Contrato de Compra e Venda</h2>
 <p>Contrato gerado pela importacao da NF ${venda.numero_nf || ""}.</p>
 <p><strong>Cliente:</strong> ${cliente.nome}</p>
 <p><strong>CPF:</strong> ${cliente.cpf}</p>
 <p><strong>Scooter:</strong> ${scooter.modelo} ${scooter.marca}</p>
 <p><strong>Chassi:</strong> ${scooter.chassi || "N/A"}</p>
-<p><strong>Valor:</strong> R$ ${venda.valor || "0,00"}</p>
-<p><strong>Data:</strong> ${venda.data_compra ? new Date(venda.data_compra).toLocaleDateString("pt-BR") : "N/A"}</p>`,
-        cliente_id: clienteId,
-        scooter_id: scooterId,
-        ordem_id: null,
-        venda_id: (vendaData as any)?.id || null,
-        status: "rascunho" as const,
-        valor: vendaValor || null,
-        data_envio: null,
-        data_visualizacao: null,
-        data_assinatura: null,
-        criado_por: user.id,
-        modelo_id: null,
-      });
+<p><strong>Valor:</strong> R$ ${scooter.valor || "0,00"}</p>`,
+          cliente_id: clienteId,
+          scooter_id: scooterId,
+          status: "rascunho" as const,
+        }).select("id").single();
+        const contratoId = (contratoData as any)?.id ?? null;
 
-      // 6. NF record
-      await (supabase.from("notas_fiscais") as any).insert({
-        numero: venda.numero_nf || `NF-${Date.now()}`,
-        ordem_id: null,
-        venda_id: (vendaData as any)?.id || null,
-        cliente_id: clienteId,
-        tipo: "entrada",
-        valor: vendaValor,
-        impostos: null,
-        pdf_url: null,
-        xml_url: null,
-        status: "importada",
-        emitida_em: venda.data_compra || null,
-      });
+        const itemValor = scooter.valor ? parseFloat(scooter.valor) : 0;
+        await (supabase.from("vendas") as any).insert({
+          vendedor_id: user.id,
+          cliente_id: clienteId,
+          scooter_id: scooterId,
+          nota_fiscal_id: notaFiscalId,
+          valor_total: itemValor,
+          entrada: 0,
+          parcelas,
+          forma_pagamento: venda.forma_pagamento || "pix",
+          contrato_id: contratoId,
+        });
+      }
 
       toast.success("Importacao concluida!", {
-        description: "Cliente, scooter, garantia, venda e contrato criados.",
+        description: `Cliente, ${validScooters.length} scooter(s), garantia(s), venda(s) e contrato(s) criados.`,
       });
       setImported(true);
       loadHistorico();
@@ -356,6 +432,7 @@ export default function VendedorImportarNFPage() {
     setExtractedData(null);
     setFileName("");
     setFileType("");
+    setFile(null);
     setImported(false);
   }
 
@@ -368,12 +445,16 @@ export default function VendedorImportarNFPage() {
     }
   }
 
+  const scootersTotal = extractedData
+    ? extractedData.scooters.reduce((sum, s) => sum + (parseFloat(s.valor) || 0), 0)
+    : 0;
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Importar Nota Fiscal</h1>
         <p className="text-muted-foreground">
-          Importe NF para cadastrar cliente, scooter e venda automaticamente.
+          Importe NF para cadastrar cliente, scooter(s) e venda(s) automaticamente. Suporta multiplas scooters.
         </p>
       </div>
 
@@ -433,7 +514,8 @@ export default function VendedorImportarNFPage() {
             </Card>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Cliente + Venda */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Cliente */}
             <Card>
               <CardHeader>
@@ -442,56 +524,31 @@ export default function VendedorImportarNFPage() {
               <CardContent className="space-y-3">
                 <div className="space-y-1">
                   <Label className="text-xs">Nome</Label>
-                  <Input value={extractedData.cliente.nome} onChange={(e) => updateData("cliente", "nome", e.target.value)} />
+                  <Input value={extractedData.cliente.nome} onChange={(e) => updateCliente("nome", e.target.value)} />
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">CPF/CNPJ</Label>
-                  <Input value={extractedData.cliente.cpf} onChange={(e) => updateData("cliente", "cpf", e.target.value)} />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">CPF/CNPJ</Label>
+                    <Input value={extractedData.cliente.cpf} onChange={(e) => updateCliente("cpf", e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Telefone</Label>
+                    <Input value={extractedData.cliente.telefone} onChange={(e) => updateCliente("telefone", e.target.value)} />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Telefone</Label>
-                  <Input value={extractedData.cliente.telefone} onChange={(e) => updateData("cliente", "telefone", e.target.value)} />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">E-mail</Label>
-                  <Input value={extractedData.cliente.email} onChange={(e) => updateData("cliente", "email", e.target.value)} />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">E-mail (login)</Label>
+                    <Input type="email" value={extractedData.cliente.email} onChange={(e) => updateCliente("email", e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Senha (acesso do cliente)</Label>
+                    <Input type="text" placeholder="min. 6 caracteres" value={extractedData.cliente.senha} onChange={(e) => updateCliente("senha", e.target.value)} />
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Endereco</Label>
-                  <Input value={extractedData.cliente.endereco} onChange={(e) => updateData("cliente", "endereco", e.target.value)} />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Scooter */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Dados da Scooter</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="space-y-1">
-                  <Label className="text-xs">Modelo</Label>
-                  <Input value={extractedData.scooter.modelo} onChange={(e) => updateData("scooter", "modelo", e.target.value)} />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Marca</Label>
-                  <Input value={extractedData.scooter.marca} onChange={(e) => updateData("scooter", "marca", e.target.value)} />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Cor</Label>
-                  <Input value={extractedData.scooter.cor} onChange={(e) => updateData("scooter", "cor", e.target.value)} />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">N. Serie</Label>
-                  <Input value={extractedData.scooter.numero_serie} onChange={(e) => updateData("scooter", "numero_serie", e.target.value)} />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Chassi</Label>
-                  <Input value={extractedData.scooter.chassi} onChange={(e) => updateData("scooter", "chassi", e.target.value)} />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Ano</Label>
-                  <Input type="number" value={extractedData.scooter.ano} onChange={(e) => updateData("scooter", "ano", e.target.value)} />
+                  <Input value={extractedData.cliente.endereco} onChange={(e) => updateCliente("endereco", e.target.value)} />
                 </div>
               </CardContent>
             </Card>
@@ -502,25 +559,121 @@ export default function VendedorImportarNFPage() {
                 <CardTitle className="text-lg">Dados da Venda</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="space-y-1">
-                  <Label className="text-xs">Numero NF</Label>
-                  <Input value={extractedData.venda.numero_nf} onChange={(e) => updateData("venda", "numero_nf", e.target.value)} />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Numero NF</Label>
+                    <Input value={extractedData.venda.numero_nf} onChange={(e) => updateVenda("numero_nf", e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Data da Compra</Label>
+                    <Input type="date" value={extractedData.venda.data_compra} onChange={(e) => updateVenda("data_compra", e.target.value)} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Valor Total (R$)</Label>
+                    <Input type="number" step="0.01" value={extractedData.venda.valor} onChange={(e) => updateVenda("valor", e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Parcelas</Label>
+                    <Input type="number" min="1" value={extractedData.venda.parcelas} onChange={(e) => updateVenda("parcelas", e.target.value)} />
+                  </div>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Valor (R$)</Label>
-                  <Input type="number" step="0.01" value={extractedData.venda.valor} onChange={(e) => updateData("venda", "valor", e.target.value)} />
+                  <Label className="text-xs">Forma de Pagamento</Label>
+                  <Select
+                    value={extractedData.venda.forma_pagamento}
+                    onValueChange={(v) => updateVenda("forma_pagamento", (v as string) ?? "")}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pix">PIX</SelectItem>
+                      <SelectItem value="cartao">Cartao</SelectItem>
+                      <SelectItem value="boleto">Boleto</SelectItem>
+                      <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                      <SelectItem value="financiamento">Financiamento</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Parcelas</Label>
-                  <Input type="number" min="1" value={extractedData.venda.parcelas} onChange={(e) => updateData("venda", "parcelas", e.target.value)} />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Data da Compra</Label>
-                  <Input type="date" value={extractedData.venda.data_compra} onChange={(e) => updateData("venda", "data_compra", e.target.value)} />
+                <div className="rounded-md bg-muted/50 px-3 py-2 text-sm flex items-center justify-between">
+                  <span className="text-muted-foreground">Soma dos itens</span>
+                  <span className="font-medium">
+                    R$ {scootersTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  </span>
                 </div>
               </CardContent>
             </Card>
           </div>
+
+          {/* Scooters (multiplas) */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Bike className="h-5 w-5" />
+                  Scooters
+                  <Badge variant="secondary">{extractedData.scooters.length}</Badge>
+                </CardTitle>
+                <Button variant="outline" size="sm" onClick={addScooter}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  Adicionar scooter
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {extractedData.scooters.map((scooter, index) => (
+                <div key={index} className="rounded-lg border p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Scooter #{index + 1}
+                    </p>
+                    {extractedData.scooters.length > 1 && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive hover:text-destructive"
+                        onClick={() => removeScooter(index)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Modelo</Label>
+                      <Input value={scooter.modelo} onChange={(e) => updateScooter(index, "modelo", e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Marca</Label>
+                      <Input value={scooter.marca} onChange={(e) => updateScooter(index, "marca", e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Cor</Label>
+                      <Input value={scooter.cor} onChange={(e) => updateScooter(index, "cor", e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Numero de Serie</Label>
+                      <Input value={scooter.numero_serie} onChange={(e) => updateScooter(index, "numero_serie", e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Chassi</Label>
+                      <Input value={scooter.chassi} onChange={(e) => updateScooter(index, "chassi", e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Ano</Label>
+                      <Input type="number" value={scooter.ano} onChange={(e) => updateScooter(index, "ano", e.target.value)} />
+                    </div>
+                    <div className="space-y-1 md:col-span-3">
+                      <Label className="text-xs">Valor do item (R$)</Label>
+                      <Input type="number" step="0.01" value={scooter.valor} onChange={(e) => updateScooter(index, "valor", e.target.value)} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
 
           {!imported && (
             <div className="flex justify-center">
@@ -533,7 +686,7 @@ export default function VendedorImportarNFPage() {
                 ) : (
                   <>
                     <Upload className="h-4 w-4 mr-2" />
-                    Importar
+                    Importar {extractedData.scooters.length > 1 ? `(${extractedData.scooters.length} scooters)` : ""}
                   </>
                 )}
               </Button>
@@ -567,29 +720,43 @@ export default function VendedorImportarNFPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Numero</TableHead>
                   <TableHead>Cliente</TableHead>
+                  <TableHead>Tipo</TableHead>
                   <TableHead>Valor</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Data</TableHead>
+                  <TableHead>Arquivo</TableHead>
+                  <TableHead>Importado Em</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {historico.map((nf) => (
-                  <TableRow key={nf.id}>
-                    <TableCell className="font-mono text-sm">{nf.numero}</TableCell>
-                    <TableCell>{nf.cliente?.nome ?? "---"}</TableCell>
-                    <TableCell>
-                      R$ {nf.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="bg-green-100 text-green-800">
-                        {nf.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{formatDate(nf.created_at)}</TableCell>
-                  </TableRow>
-                ))}
+                {historico.map((nf) => {
+                  const n = nf as unknown as {
+                    id: string;
+                    cliente?: { nome: string } | null;
+                    tipo_arquivo?: string | null;
+                    valor?: number | null;
+                    arquivo_url?: string | null;
+                    created_at: string;
+                  };
+                  return (
+                    <TableRow key={n.id}>
+                      <TableCell>{n.cliente?.nome ?? "---"}</TableCell>
+                      <TableCell className="uppercase text-xs">{n.tipo_arquivo ?? "---"}</TableCell>
+                      <TableCell>
+                        R$ {(n.valor ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                      </TableCell>
+                      <TableCell>
+                        {n.arquivo_url ? (
+                          <a href={n.arquivo_url} target="_blank" rel="noopener noreferrer" className="text-primary underline text-sm">
+                            Abrir
+                          </a>
+                        ) : (
+                          "---"
+                        )}
+                      </TableCell>
+                      <TableCell>{formatDate(n.created_at)}</TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}

@@ -260,16 +260,93 @@ export type KmHistorico = {
 export type Venda = {
   id: string;
   vendedor_id: string;
-  cliente_id: string;
-  scooter_id: string;
+  cliente_id: string | null;
+  scooter_id: string | null;
   nota_fiscal_id: string | null;
   valor_total: number | null;
   entrada: number | null;
   parcelas: number | null;
   forma_pagamento: string | null;
   contrato_id: string | null;
+  unidade: string | null;
+  modelo: string | null;
+  origem: string | null;
+  lead_id: string | null;
   created_at: string;
 };
+
+export type EstoqueMoto = {
+  id: string;
+  unidade: string;
+  modelo: string;
+  cor: string | null;
+  chassi: string | null;
+  quantidade: number;
+  quantidade_montar: number;
+  estado: string;
+  vendedor_id: string | null;
+  observacoes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+export type EstoqueMotoInsert = Omit<EstoqueMoto, 'id' | 'created_at' | 'updated_at'> & {
+  id?: string; created_at?: string; updated_at?: string;
+};
+export type EstoqueMotoUpdate = Partial<EstoqueMotoInsert>;
+
+export type FolhaPonto = {
+  id: string;
+  colaborador_id: string;
+  data: string;
+  entrada: string | null;
+  almoco_saida: string | null;
+  almoco_volta: string | null;
+  saida: string | null;
+  atraso_minutos: number;
+  justificativa: string | null;
+  created_at: string;
+  updated_at: string;
+};
+export type FolhaPontoInsert = Omit<FolhaPonto, 'id' | 'created_at' | 'updated_at'> & {
+  id?: string; created_at?: string; updated_at?: string;
+};
+export type FolhaPontoUpdate = Partial<FolhaPontoInsert>;
+
+export type Lead = {
+  id: string;
+  nome: string;
+  telefone: string | null;
+  origem: string;
+  unidade: string | null;
+  modelo_interesse: string | null;
+  status: string;
+  vendedor_id: string | null;
+  observacoes: string | null;
+  created_at: string;
+};
+export type LeadInsert = Omit<Lead, 'id' | 'created_at'> & { id?: string; created_at?: string };
+export type LeadUpdate = Partial<LeadInsert>;
+
+export type Montagem = {
+  id: string;
+  modelo: string;
+  unidade: string | null;
+  chassi: string | null;
+  responsavel_id: string | null;
+  data_agendada: string | null;
+  prazo: string | null;
+  horas: number;
+  valor_hora: number;
+  valor_total: number;
+  status: string;
+  observacoes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+export type MontagemInsert = Omit<Montagem, 'id' | 'created_at' | 'updated_at'> & {
+  id?: string; created_at?: string; updated_at?: string;
+};
+export type MontagemUpdate = Partial<MontagemInsert>;
 
 export type Notificacao = {
   id: string;
@@ -307,6 +384,7 @@ type TableDefinition<Row, Insert = Row, Update = Partial<Row>> = {
   Row: Row;
   Insert: Insert;
   Update: Update;
+  Relationships: [];
 };
 
 export type ProfileInsert = Omit<Profile, 'created_at' | 'updated_at'> & {
@@ -471,6 +549,14 @@ export type Database = {
       vendas: TableDefinition<Venda, VendaInsert, VendaUpdate>;
       notificacoes: TableDefinition<Notificacao, NotificacaoInsert, NotificacaoUpdate>;
       empresa_config: TableDefinition<EmpresaConfig, EmpresaConfigInsert, EmpresaConfigUpdate>;
+      estoque_motos: TableDefinition<EstoqueMoto, EstoqueMotoInsert, EstoqueMotoUpdate>;
+      folha_ponto: TableDefinition<FolhaPonto, FolhaPontoInsert, FolhaPontoUpdate>;
+      leads: TableDefinition<Lead, LeadInsert, LeadUpdate>;
+      montagens: TableDefinition<Montagem, MontagemInsert, MontagemUpdate>;
     };
+    Views: { [_ in never]: never };
+    Functions: { [_ in never]: never };
+    Enums: { [_ in never]: never };
+    CompositeTypes: { [_ in never]: never };
   };
 };

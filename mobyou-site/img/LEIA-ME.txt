@@ -1,0 +1,24 @@
+FOTOS DOS MODELOS — COMO FUNCIONA
+
+Cada modelo tem uma foto POR COR. O nome do arquivo segue o padrão:
+  {modelo}-{cor}.jpg     (tudo minúsculo)
+
+Exemplos que já estão aqui:
+  x13-vermelho.jpg   x13-azul.jpg   x13-preto.jpg ...
+  beach-x11-vermelho.jpg   lola-verde.jpg   triciclo-wave-rosa.jpg
+
+Ao clicar numa cor no site, a foto do card troca para o arquivo daquela cor.
+
+PARA TROCAR / ADICIONAR UMA FOTO OU COR:
+  1) Coloque a nova foto aqui com o nome no padrão acima
+     (proporção 4:3, ex.: 1200x900, fica perfeita).
+  2) Abra ../index.html e ache a lista MODELOS (dentro do <script>).
+  3) Em "cores" do modelo, ajuste/adicione uma linha:
+       { nome: "Verde", hex: "#5E7A57", img: "x13-verde.jpg" }
+     - nome  = texto que aparece em "Cor:"
+     - hex   = cor da bolinha (código hexadecimal)
+     - img   = nome do arquivo aqui na pasta img/
+  4) A 1ª cor da lista é a que aparece por padrão no card.
+
+As fotos foram baixadas da pasta pública do Drive "MOTOS MOBYOU".
+Logo da marca (opcional): coloque logo.png aqui.

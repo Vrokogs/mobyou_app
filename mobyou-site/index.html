@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MOBYOU — Mobilidade Elétrica · Litoral Norte</title>
+<meta name="description" content="Bikes e scooters elétricas no Litoral Norte. Sua mobilidade, do seu jeito. A maior da região." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          ink: "#0A0A0B",
+          panel: "#141416",
+          steel: "#1C1C1F",
+          orange: "#F26B1D",
+          orange2: "#FF9244",
+          fire: "#E5400C",
+          smoke: "#B8BCC2",
+          off: "#F4F4F5",
+        },
+        fontFamily: {
+          display: ['"Bricolage Grotesque"', "sans-serif"],
+          body: ['"Inter"', "sans-serif"],
+          mono: ['"Space Mono"', "monospace"],
+        },
+      },
+    },
+  };
+</script>
+<style>
+  html { scroll-behavior: smooth; }
+  body { background:#0A0A0B; }
+  .grain::before{
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:1; opacity:.05;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  /* cromado metálico (igual ao logo) */
+  .chrome{
+    background:linear-gradient(180deg,#ffffff 0%,#e7e9ec 20%,#b3b7bd 46%,#71767d 62%,#c9cdd2 80%,#888d94 100%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    text-shadow:0 1px 0 rgba(255,255,255,.06);
+  }
+  .firetext{ background:linear-gradient(180deg,#FF9244 0%,#F26B1D 45%,#E5400C 100%); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .text-stroke{ -webkit-text-stroke:1.5px rgba(242,107,29,.6); color:transparent; }
+  .hero-grad{ background:
+    radial-gradient(1100px 480px at 78% -8%, rgba(242,107,29,.28), transparent 60%),
+    radial-gradient(800px 600px at -5% 20%, rgba(229,64,12,.16), transparent 55%),
+    linear-gradient(180deg,#0A0A0B 0%, #141416 100%); }
+  @keyframes dash { to { stroke-dashoffset: 0; } }
+  .route-line{ stroke-dasharray:1200; stroke-dashoffset:1200; animation: dash 3s ease forwards; }
+  @keyframes floaty { 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-10px) } }
+  .floaty{ animation: floaty 6s ease-in-out infinite; }
+  @keyframes marquee { to { transform: translateX(-50%); } }
+  .marquee{ animation: marquee 26s linear infinite; }
+  .reveal{ opacity:0; transform:translateY(24px); transition:all .7s cubic-bezier(.2,.7,.2,1); }
+  .reveal.in{ opacity:1; transform:none; }
+  @media (prefers-reduced-motion: reduce){ .route-line,.floaty,.marquee{animation:none} .reveal{opacity:1;transform:none} }
+  .card-glow{ transition: all .35s cubic-bezier(.2,.7,.2,1); }
+  .card-glow:hover{ box-shadow: 0 0 0 1px rgba(242,107,29,.45), 0 30px 60px -20px rgba(0,0,0,.7); transform: translateY(-6px); }
+</style>
+</head>
+<body class="grain font-body text-smoke antialiased selection:bg-orange selection:text-ink">
+
+<!-- NAV -->
+<header class="fixed top-0 inset-x-0 z-50">
+  <div class="mx-auto max-w-7xl px-5 lg:px-8">
+    <div class="mt-4 flex items-center justify-between rounded-2xl border border-white/10 bg-ink/70 backdrop-blur-xl px-4 py-3">
+      <a href="#" class="flex items-center gap-2.5">
+        <span class="grid h-9 w-9 place-items-center rounded-md bg-gradient-to-br from-orange2 to-fire font-display text-lg font-extrabold text-ink">M</span>
+        <span class="leading-none">
+          <span class="block font-display text-lg font-extrabold tracking-tight chrome">MOBYOU</span>
+          <span class="block font-mono text-[9px] tracking-[0.25em] text-orange">LITORAL NORTE</span>
+        </span>
+      </a>
+      <nav class="hidden md:flex items-center gap-8 text-sm text-smoke/70">
+        <a href="#modelos" class="hover:text-white transition">Modelos</a>
+        <a href="#rota" class="hover:text-white transition">Lojas</a>
+        <a href="#porque" class="hover:text-white transition">Por que MOBYOU</a>
+        <a href="#contato" class="hover:text-white transition">Contato</a>
+      </nav>
+      <a href="#contato" class="rounded-full bg-orange px-5 py-2 text-sm font-semibold text-ink hover:bg-orange2 transition">Fale conosco</a>
+    </div>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero-grad relative overflow-hidden pt-40 pb-24 lg:pt-52 lg:pb-32">
+  <svg class="absolute inset-0 h-full w-full opacity-60" viewBox="0 0 1440 600" fill="none" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <path class="route-line" d="M-50 430 C 250 370, 380 480, 620 410 S 1060 310, 1500 370" stroke="#F26B1D" stroke-width="2" stroke-opacity=".45"/>
+    <circle cx="300" cy="413" r="5" fill="#FF9244"/><circle cx="720" cy="402" r="5" fill="#FF9244"/><circle cx="1140" cy="344" r="5" fill="#FF9244"/>
+  </svg>
+
+  <div class="relative z-10 mx-auto max-w-7xl px-5 lg:px-8">
+    <p class="font-mono text-xs uppercase tracking-[0.3em] text-orange mb-6">Mobilidade Elétrica · A maior da região</p>
+    <h1 class="font-display font-extrabold uppercase leading-[0.86] tracking-tight text-[15vw] sm:text-[11vw] lg:text-[8.5rem]">
+      <span class="chrome">Sua mobilidade,</span><br/>
+      <span class="text-stroke">do seu</span> <span class="firetext">jeito.</span>
+    </h1>
+    <p class="mt-8 max-w-xl text-lg text-smoke/80">
+      Bikes e scooters elétricas que transformam como você se move pela cidade.
+      <span class="text-white font-medium">Saia do trânsito. Entre no futuro.</span>
+    </p>
+    <div class="mt-10 flex flex-wrap items-center gap-4">
+      <a href="#modelos" class="group rounded-full bg-orange px-7 py-3.5 font-semibold text-ink hover:bg-orange2 transition">
+        Ver modelos <span class="inline-block transition group-hover:translate-x-1">→</span>
+      </a>
+      <a href="#contato" class="rounded-full border border-white/15 px-7 py-3.5 font-semibold text-smoke hover:border-orange hover:text-orange transition">
+        Visitar uma loja
+      </a>
+    </div>
+
+    <div class="mt-16 grid grid-cols-3 max-w-lg gap-8 border-t border-white/10 pt-8">
+      <div><p class="font-display text-3xl font-extrabold firetext">13</p><p class="text-xs text-smoke/50 mt-1">modelos</p></div>
+      <div><p class="font-display text-3xl font-extrabold firetext">3</p><p class="text-xs text-smoke/50 mt-1">lojas no litoral</p></div>
+      <div><p class="font-display text-3xl font-extrabold firetext">100%</p><p class="text-xs text-smoke/50 mt-1">elétrico</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- MARQUEE -->
+<div class="border-y border-white/10 bg-panel py-4 overflow-hidden">
+  <div class="marquee flex w-max gap-10 whitespace-nowrap font-display text-2xl font-extrabold uppercase text-white/10">
+    <span>Liberdade</span><span class="text-orange">·</span><span>Economia</span><span class="text-fire">·</span><span>Agilidade</span><span class="text-orange">·</span><span>Zero Emissão</span><span class="text-fire">·</span>
+    <span>Liberdade</span><span class="text-orange">·</span><span>Economia</span><span class="text-fire">·</span><span>Agilidade</span><span class="text-orange">·</span><span>Zero Emissão</span><span class="text-fire">·</span>
+  </div>
+</div>
+
+<!-- MODELOS -->
+<section id="modelos" class="bg-ink py-24 lg:py-32">
+  <div class="mx-auto max-w-7xl px-5 lg:px-8">
+    <div class="flex flex-wrap items-end justify-between gap-6 mb-14 reveal">
+      <div>
+        <p class="font-mono text-xs uppercase tracking-[0.3em] text-orange mb-3">Escolha sua próxima forma de se mover</p>
+        <h2 class="font-display text-4xl lg:text-6xl font-extrabold uppercase leading-none tracking-tight chrome">A linha MOBYOU</h2>
+      </div>
+      <p class="max-w-sm text-smoke/60">Pensadas para quem busca liberdade, economia e agilidade no dia a dia do litoral.</p>
+    </div>
+
+    <div id="modelGrid" class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"></div>
+  </div>
+
+  <script>
+    // ─────────────────────────────────────────────────────────────
+    //  MODELOS + CORES REAIS  ·  cada cor aponta para uma foto.
+    //  Clicar na cor troca a imagem do card. Fotos em /img.
+    //  A 1ª cor de cada modelo é a que aparece por padrão.
+    //  Para trocar/editar: mude nome, hex (bolinha) e img (arquivo).
+    // ─────────────────────────────────────────────────────────────
+    const MODELOS = [
+      { nome: "Mobyou X13", slug: "x13", tipo: "Scooter", tag: "Autonomia urbana", cores: [
+        { nome: "Vermelho", hex: "#C42B23", img: "x13-vermelho.jpg" },
+        { nome: "Azul",     hex: "#34518F", img: "x13-azul.jpg" },
+        { nome: "Preto",    hex: "#17171A", img: "x13-preto.jpg" },
+        { nome: "Turquesa", hex: "#23B3B0", img: "x13-turquesa.jpg" },
+        { nome: "Branco",   hex: "#E8E8EA", img: "x13-branco.jpg" },
+        { nome: "Rosa",     hex: "#F27DB0", img: "x13-rosa.jpg" },
+      ] },
+      { nome: "Mobyou X14", slug: "x14", tipo: "Scooter", tag: "Mais potência", cores: [
+        { nome: "Vermelho", hex: "#C42B23", img: "x14-vermelho.jpg" },
+        { nome: "Azul",     hex: "#34518F", img: "x14-azul.jpg" },
+        { nome: "Preto",    hex: "#17171A", img: "x14-preto.jpg" },
+        { nome: "Branco",   hex: "#E8E8EA", img: "x14-branco.jpg" },
+      ] },
+      { nome: "Mobyou Beach X11", slug: "beach-x11", tipo: "Beach", tag: "Feita pro litoral", destaque: true, cores: [
+        { nome: "Vermelho", hex: "#C42B23", img: "beach-x11-vermelho.jpg" },
+        { nome: "Preto",    hex: "#17171A", img: "beach-x11-preto.jpg" },
+        { nome: "Branco",   hex: "#E8E8EA", img: "beach-x11-branco.jpg" },
+        { nome: "Turquesa", hex: "#23B3B0", img: "beach-x11-turquesa.jpg" },
+      ] },
+      { nome: "Mobyou Bibi", slug: "bibi", tipo: "Compacta", tag: "Pequena no tamanho. Gigante na praticidade.", cores: [
+        { nome: "Vermelho", hex: "#C42B23", img: "bibi-vermelho.jpg" },
+        { nome: "Branco",   hex: "#EDE9DC", img: "bibi-branco.jpg" },
+      ] },
+      { nome: "Mobyou Lola", slug: "lola", tipo: "Scooter", tag: "Estilo e conforto", cores: [
+        { nome: "Azul",   hex: "#A9D4DE", img: "lola-azul.jpg" },
+        { nome: "Verde",  hex: "#5E7A57", img: "lola-verde.jpg" },
+        { nome: "Branco", hex: "#E8E8EA", img: "lola-branco.jpg" },
+        { nome: "Preto",  hex: "#17171A", img: "lola-preto.jpg" },
+      ] },
+      { nome: "Mobyou Migo", slug: "migo", tipo: "Scooter", tag: "Leve e ágil", cores: [
+        { nome: "Verde",    hex: "#5E7A57", img: "migo-verde.jpg" },
+        { nome: "Vermelho", hex: "#8E2230", img: "migo-vermelho.jpg" },
+        { nome: "Branco",   hex: "#E8E8EA", img: "migo-branco.jpg" },
+      ] },
+      { nome: "Mobyou Bolin", slug: "bolin", tipo: "Scooter", tag: "Robusta", cores: [
+        { nome: "Bordô", hex: "#6E2230", img: "bolin-bordo.jpg" },
+      ] },
+      { nome: "Mobyou Fyron", slug: "fyron", tipo: "Scooter", tag: "Performance", cores: [
+        { nome: "Azul",     hex: "#2E4A78", img: "fyron-azul.jpg" },
+        { nome: "Vermelho", hex: "#8E2230", img: "fyron-vermelho.jpg" },
+        { nome: "Branco",   hex: "#E8E8EA", img: "fyron-branco.jpg" },
+      ] },
+      { nome: "Mobyou Frankfurt", slug: "frankfurt", tipo: "Scooter", tag: "Design marcante", cores: [
+        { nome: "Preto",  hex: "#17171A", img: "frankfurt-preto.jpg" },
+        { nome: "Branco", hex: "#E8E8EA", img: "frankfurt-branco.jpg" },
+      ] },
+      { nome: "Mobyou T6 Plus", slug: "t6-plus", tipo: "Scooter", tag: "Versátil", cores: [
+        { nome: "Azul",     hex: "#7FB7C4", img: "t6-plus-azul.jpg" },
+        { nome: "Vermelho", hex: "#C42B23", img: "t6-plus-vermelho.jpg" },
+      ] },
+      { nome: "Mobyou Triciclo", slug: "triciclo", tipo: "Triciclo", tag: "Estabilidade total", cores: [
+        { nome: "Preto",    hex: "#17171A", img: "triciclo-preto.jpg" },
+        { nome: "Vermelho", hex: "#C42B23", img: "triciclo-vermelho.jpg" },
+      ] },
+      { nome: "Mobyou Triciclo Wave", slug: "triciclo-wave", tipo: "Triciclo", tag: "Carga e equilíbrio", cores: [
+        { nome: "Creme", hex: "#E9E0CD", img: "triciclo-wave-creme.jpg" },
+        { nome: "Rosa",  hex: "#D95C86", img: "triciclo-wave-rosa.jpg" },
+        { nome: "Bordô", hex: "#6E2230", img: "triciclo-wave-bordo.jpg" },
+      ] },
+      { nome: "Bike Atlanta", slug: "atlanta", tipo: "Bike", tag: "Pedal + elétrico", cores: [
+        { nome: "Preto", hex: "#17171A", img: "atlanta-preto.jpg" },
+      ] },
+    ];
+
+    const WA = "https://wa.me/5511974234265";
+    const waLink = (modelo, cor) =>
+      `${WA}?text=${encodeURIComponent(`Olá! Tenho interesse na ${modelo}${cor ? ` na cor ${cor}` : ""}.`)}`;
+
+    const grid = document.getElementById("modelGrid");
+    grid.innerHTML = MODELOS.map((m) => {
+      const cores = m.cores;
+      const c0 = cores[0];
+      const swatches = cores.map((c, ci) => `
+            <button type="button" role="radio" aria-checked="${ci === 0}" aria-label="Cor ${c.nome}" title="${c.nome}"
+              data-cor="${c.nome}" data-img="img/${c.img}"
+              class="cor-swatch h-6 w-6 rounded-full ring-2 ring-offset-2 ${m.destaque ? "ring-offset-[#F26B1D]" : "ring-offset-panel"} ${ci === 0 ? (m.destaque ? "ring-ink" : "ring-orange") : "ring-transparent"} transition hover:scale-110"
+              style="background:${c.hex}; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.55), 0 0 0 1px rgba(0,0,0,.35);"></button>`).join("");
+      return `
+      <article data-card ${m.destaque ? "data-destaque" : ""} class="card-glow group relative overflow-hidden rounded-3xl border border-white/10 ${m.destaque ? "bg-gradient-to-br from-orange to-fire text-ink" : "bg-panel"} reveal">
+        <div class="relative aspect-[4/3] overflow-hidden ${m.destaque ? "bg-ink/10" : "bg-ink"}">
+          <div class="absolute inset-0 grid place-items-center">
+            <span class="font-display text-2xl font-extrabold uppercase ${m.destaque ? "text-ink/30" : "text-white/10"}">${m.nome.replace("Mobyou ", "")}</span>
+          </div>
+          <img data-hero src="img/${c0.img}" alt="${m.nome} ${c0.nome}" loading="lazy"
+               class="relative z-10 h-full w-full object-cover transition duration-500 group-hover:scale-105"
+               onerror="this.onerror=null;this.src='img/${m.slug}.jpg';" />
+          ${cores.length > 1 ? `<span class="absolute bottom-2 right-2 z-20 rounded-full ${m.destaque ? "bg-ink/70 text-white" : "bg-black/60 text-white"} px-2.5 py-1 font-mono text-[10px]">${cores.length} cores</span>` : ""}
+        </div>
+        <div class="p-6">
+          <p class="font-mono text-xs ${m.destaque ? "text-ink/70" : "text-orange"}">${m.tipo}</p>
+          <h3 class="font-display text-2xl font-extrabold uppercase ${m.destaque ? "text-ink" : "text-white"} mt-1 leading-none">${m.nome}</h3>
+          <p class="text-sm ${m.destaque ? "text-ink/70" : "text-smoke/55"} mt-2">${m.tag}</p>
+
+          <div class="mt-4">
+            <p class="font-mono text-[11px] uppercase tracking-wider ${m.destaque ? "text-ink/60" : "text-smoke/45"}">
+              Cor: <span data-cor-nome class="font-semibold ${m.destaque ? "text-ink" : "text-white"}">${c0.nome}</span>
+            </p>
+            <div class="mt-2 flex flex-wrap items-center gap-2.5" role="radiogroup" aria-label="Cores disponíveis para ${m.nome}">
+              ${swatches}
+            </div>
+          </div>
+
+          <a data-wa href="${waLink(m.nome, c0.nome)}" class="mt-5 inline-flex items-center gap-1 text-sm font-semibold ${m.destaque ? "text-ink" : "text-white group-hover:text-orange"} transition">
+            Saber mais →
+          </a>
+        </div>
+      </article>`;
+    }).join("");
+
+    // Seleção de cor por card: troca a foto, o rótulo e o link do WhatsApp
+    grid.querySelectorAll("[data-card]").forEach((card) => {
+      const modelo = card.querySelector("h3").textContent;
+      const heroEl = card.querySelector("[data-hero]");
+      const nomeEl = card.querySelector("[data-cor-nome]");
+      const waEl = card.querySelector("[data-wa]");
+      const swatches = card.querySelectorAll(".cor-swatch");
+      const activeRing = card.hasAttribute("data-destaque") ? "ring-ink" : "ring-orange";
+      swatches.forEach((sw) => {
+        sw.addEventListener("click", () => {
+          const cor = sw.dataset.cor;
+          nomeEl.textContent = cor;
+          heroEl.src = sw.dataset.img;
+          heroEl.alt = `${modelo} ${cor}`;
+          waEl.href = waLink(modelo, cor);
+          swatches.forEach((o) => {
+            o.setAttribute("aria-checked", String(o === sw));
+            o.classList.remove("ring-orange", "ring-ink", "ring-transparent");
+            o.classList.add(o === sw ? activeRing : "ring-transparent");
+          });
+        });
+      });
+    });
+  </script>
+</section>
+
+<!-- ROTA DO LITORAL -->
+<section id="rota" class="relative bg-panel py-24 lg:py-32 overflow-hidden">
+  <div class="mx-auto max-w-7xl px-5 lg:px-8">
+    <p class="font-mono text-xs uppercase tracking-[0.3em] text-orange mb-3 reveal">A rota do litoral</p>
+    <h2 class="font-display text-4xl lg:text-6xl font-extrabold uppercase leading-none tracking-tight chrome reveal">Onde a gente está</h2>
+
+    <div class="relative mt-20">
+      <svg class="absolute left-0 right-0 top-6 hidden md:block" height="40" width="100%" viewBox="0 0 1000 40" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M40 20 C 280 -10, 380 50, 500 20 S 760 -5, 960 20" stroke="#F26B1D" stroke-width="2" stroke-dasharray="6 8" fill="none"/>
+      </svg>
+      <div class="grid gap-10 md:grid-cols-3 relative">
+        <div class="reveal">
+          <div class="h-3 w-3 rounded-full bg-orange ring-4 ring-orange/20 mb-6"></div>
+          <h3 class="font-display text-2xl font-extrabold uppercase text-white">São Sebastião</h3>
+          <p class="text-smoke/55 mt-1">Pontal da Cruz</p>
+        </div>
+        <div class="reveal">
+          <div class="h-3 w-3 rounded-full bg-orange ring-4 ring-orange/20 mb-6"></div>
+          <h3 class="font-display text-2xl font-extrabold uppercase text-white">Boiçucanga</h3>
+          <p class="text-smoke/55 mt-1">Costa Sul</p>
+        </div>
+        <div class="reveal">
+          <div class="h-3 w-3 rounded-full bg-orange ring-4 ring-orange/20 mb-6"></div>
+          <h3 class="font-display text-2xl font-extrabold uppercase text-white">Caraguatatuba</h3>
+          <p class="text-smoke/55 mt-1">Shopping</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- POR QUE -->
+<section id="porque" class="bg-off text-ink py-24 lg:py-32">
+  <div class="mx-auto max-w-7xl px-5 lg:px-8 grid lg:grid-cols-3 gap-8">
+    <div class="reveal">
+      <span class="font-mono text-fire text-sm">01</span>
+      <h3 class="font-display text-3xl font-extrabold uppercase mt-2">Econômica</h3>
+      <p class="mt-3 text-ink/60">Recarregue na tomada. Gaste centavos onde você gastaria reais.</p>
+    </div>
+    <div class="reveal">
+      <span class="font-mono text-fire text-sm">02</span>
+      <h3 class="font-display text-3xl font-extrabold uppercase mt-2">Prática</h3>
+      <p class="mt-3 text-ink/60">Recarga simples, cestinha pras compras e leve pro dia a dia.</p>
+    </div>
+    <div class="reveal">
+      <span class="font-mono text-fire text-sm">03</span>
+      <h3 class="font-display text-3xl font-extrabold uppercase mt-2">Pro litoral</h3>
+      <p class="mt-3 text-ink/60">Ideal pra praia, mercado e pequenos trajetos. Do seu jeito.</p>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section id="contato" class="relative overflow-hidden bg-gradient-to-br from-orange to-fire text-ink py-24 lg:py-32">
+  <div class="mx-auto max-w-7xl px-5 lg:px-8 text-center">
+    <h2 class="font-display text-5xl lg:text-7xl font-extrabold uppercase leading-none tracking-tight reveal">Movendo pessoas,<br/>transformando cidades.</h2>
+    <p class="mt-6 text-ink/80 reveal">Venha conhecer a linha MOBYOU e escolha sua próxima forma de se mover.</p>
+    <a href="https://wa.me/5511974234265" class="mt-10 inline-flex items-center gap-2 rounded-full bg-ink px-8 py-4 font-semibold text-white hover:bg-steel transition reveal">
+      WhatsApp (11) 97423-4265
+    </a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="bg-ink py-12 border-t border-white/10">
+  <div class="mx-auto max-w-7xl px-5 lg:px-8 flex flex-wrap items-center justify-between gap-4 text-smoke/50 text-sm">
+    <span class="leading-none">
+      <span class="block font-display text-lg font-extrabold chrome">MOBYOU</span>
+      <span class="block font-mono text-[9px] tracking-[0.25em] text-orange">MOBILIDADE ELÉTRICA · LITORAL NORTE</span>
+    </span>
+    <span>© 2026 MOBYOU — A maior da região</span>
+  </div>
+  <div class="mx-auto max-w-7xl px-5 lg:px-8 mt-8 pt-6 border-t border-white/5 flex flex-wrap items-center justify-center gap-1.5 text-center text-smoke/40 text-xs">
+    <span>Criação e desenvolvimento do site por</span>
+    <span class="font-display font-extrabold uppercase tracking-wide text-smoke/70">Exo Agency</span>
+    <span class="hidden sm:inline text-smoke/25">·</span>
+    <span class="w-full sm:w-auto">Todos os direitos de criação reservados © 2026 Exo Agency.</span>
+  </div>
+</footer>
+
+<script>
+  const io = new IntersectionObserver((es)=>es.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target);} }), {threshold:.15});
+  document.querySelectorAll('.reveal').forEach((el,i)=>{ el.style.transitionDelay=(i%3*80)+'ms'; io.observe(el); });
+</script>
+</body>
+</html>

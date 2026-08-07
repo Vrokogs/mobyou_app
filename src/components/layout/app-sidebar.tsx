@@ -20,6 +20,7 @@ import {
   LayoutDashboard, Users, Bike, ClipboardList, FileText, Wrench,
   Package, ShieldCheck, Award, Upload, DollarSign, Settings,
   LogOut, ChevronUp, UserCog, Hash, ShoppingCart,
+  Clock, Trophy, Radar,
 } from "lucide-react";
 
 interface NavItem {
@@ -63,7 +64,11 @@ const gestorNav: NavGroup[] = [
     label: "Gestão",
     items: [
       { title: "Estoque", href: "/gestor/estoque", icon: Package },
+      { title: "Vendas", href: "/gestor/vendas", icon: ShoppingCart },
+      { title: "Ranking", href: "/gestor/ranking", icon: Trophy },
+      { title: "Montagem", href: "/gestor/montagem", icon: Wrench },
       { title: "Financeiro", href: "/gestor/financeiro", icon: DollarSign },
+      { title: "Folha de Ponto", href: "/gestor/ponto", icon: Clock },
       { title: "Usuários", href: "/gestor/usuarios", icon: UserCog },
     ],
   },
@@ -75,6 +80,7 @@ const vendedorNav: NavGroup[] = [
     items: [
       { title: "Dashboard", href: "/vendedor", icon: LayoutDashboard },
       { title: "Clientes", href: "/vendedor/clientes", icon: Users },
+      { title: "Leads", href: "/vendedor/leads", icon: Radar },
       { title: "Vendas", href: "/vendedor/vendas", icon: ShoppingCart },
     ],
   },
@@ -83,6 +89,13 @@ const vendedorNav: NavGroup[] = [
     items: [
       { title: "Contratos", href: "/vendedor/contratos", icon: FileText },
       { title: "Importar NF", href: "/vendedor/importar-nf", icon: Upload },
+    ],
+  },
+  {
+    label: "Gestão",
+    items: [
+      { title: "Estoque", href: "/vendedor/estoque", icon: Package },
+      { title: "Folha de Ponto", href: "/vendedor/ponto", icon: Clock },
     ],
   },
 ];
@@ -97,10 +110,34 @@ const tecnicoNav: NavGroup[] = [
   },
 ];
 
+const clienteNav: NavGroup[] = [
+  {
+    label: "Principal",
+    items: [
+      { title: "Início", href: "/cliente", icon: LayoutDashboard },
+      { title: "Minha Scooter", href: "/cliente/scooter", icon: Bike },
+    ],
+  },
+  {
+    label: "Serviços",
+    items: [
+      { title: "Ordens de Serviço", href: "/cliente/ordens", icon: Wrench },
+      { title: "Histórico", href: "/cliente/historico", icon: ClipboardList },
+    ],
+  },
+  {
+    label: "Documentos",
+    items: [
+      { title: "Meus Documentos", href: "/cliente/documentos", icon: FileText },
+    ],
+  },
+];
+
 const navByRole: Record<string, NavGroup[]> = {
   gestor: gestorNav,
   vendedor: vendedorNav,
   tecnico: tecnicoNav,
+  cliente: clienteNav,
 };
 
 interface AppSidebarProps {
@@ -154,11 +191,12 @@ export function AppSidebar({ userRole, userName, userEmail, onLogout }: AppSideb
                     (item.href !== `/${userRole}` && pathname.startsWith(item.href));
                   return (
                     <SidebarMenuItem key={item.href}>
-                      <SidebarMenuButton asChild isActive={isActive}>
-                        <Link href={item.href}>
-                          <item.icon className="h-4 w-4" />
-                          <span>{item.title}</span>
-                        </Link>
+                      <SidebarMenuButton
+                        render={<Link href={item.href} />}
+                        isActive={isActive}
+                      >
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   );
@@ -173,19 +211,19 @@ export function AppSidebar({ userRole, userName, userEmail, onLogout }: AppSideb
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton className="h-auto py-2">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-[#D4731A] text-white text-xs font-bold">
-                      {initials}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 text-left">
-                    <p className="text-sm font-medium truncate">{userName}</p>
-                    <p className="text-xs text-sidebar-foreground/60 truncate">{userEmail}</p>
-                  </div>
-                  <ChevronUp className="h-4 w-4" />
-                </SidebarMenuButton>
+              <DropdownMenuTrigger
+                render={<SidebarMenuButton className="h-auto py-2" />}
+              >
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-[#D4731A] text-white text-xs font-bold">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 text-left">
+                  <p className="text-sm font-medium truncate">{userName}</p>
+                  <p className="text-xs text-sidebar-foreground/60 truncate">{userEmail}</p>
+                </div>
+                <ChevronUp className="h-4 w-4" />
               </DropdownMenuTrigger>
               <DropdownMenuContent side="top" align="start" className="w-56">
                 <DropdownMenuItem>

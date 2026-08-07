@@ -41,9 +41,12 @@ import {
   FileText,
   ShieldCheck,
   FolderOpen,
+  FilePlus2,
+  Loader2,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { format } from "date-fns";
+import { toast } from "sonner";
 import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, GARANTIA_STATUS, CONTRATO_STATUS } from "@/lib/constants";
 import type { Profile, Scooter, OrdemServico, Contrato, Garantia } from "@/types/database";
 import type { OrdemServicoStatus, GarantiaStatus, ContratoStatus } from "@/types/database";
@@ -69,6 +72,7 @@ export default function ClienteDetailPage() {
   const [loading, setLoading] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [generatingDocs, setGeneratingDocs] = useState(false);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<EditFormData>();
 
@@ -114,7 +118,7 @@ export default function ClienteDetailPage() {
     setScooters((scootersRes.data ?? []) as Scooter[]);
     setOrdens((ordensRes.data ?? []) as OrdemServico[]);
     setContratos((contratosRes.data ?? []) as Contrato[]);
-    setGarantias((garantiasRes.data ?? []) as (Garantia & { scooter?: { modelo: string; chassi: string | null } })[]);
+    setGarantias((garantiasRes.data ?? []) as unknown as (Garantia & { scooter?: { modelo: string; chassi: string | null } })[]);
     setLoading(false);
   }, [clienteId, reset]);
 
@@ -139,6 +143,82 @@ export default function ClienteDetailPage() {
     setSaving(false);
     setEditOpen(false);
     loadData();
+  }
+
+  function aplicarVariaveis(template: string, scooter: Scooter | null) {
+    let r = template;
+    const c = cliente;
+    if (c) {
+      r = r.replace(/\{\{cliente_nome\}\}/g, c.nome || "");
+      r = r.replace(/\{\{cliente_cpf\}\}/g, c.cpf || "");
+      r = r.replace(/\{\{cliente_telefone\}\}/g, c.telefone || "");
+      r = r.replace(/\{\{cliente_email\}\}/g, c.email || "");
+      r = r.replace(/\{\{cliente_endereco\}\}/g, c.endereco || "");
+    }
+    if (scooter) {
+      r = r.replace(/\{\{scooter_modelo\}\}/g, scooter.modelo || "");
+      r = r.replace(/\{\{scooter_marca\}\}/g, scooter.marca || "");
+      r = r.replace(/\{\{scooter_chassi\}\}/g, scooter.chassi || "");
+      r = r.replace(/\{\{scooter_numero_serie\}\}/g, scooter.numero_serie || "");
+      r = r.replace(/\{\{scooter_cor\}\}/g, scooter.cor || "");
+      r = r.replace(/\{\{scooter_ano\}\}/g, String(scooter.ano ?? ""));
+    }
+    r = r.replace(/\{\{data_atual\}\}/g, new Date().toLocaleDateString("pt-BR"));
+    r = r.replace(
+      /\{\{data_extenso\}\}/g,
+      new Date().toLocaleDateString("pt-BR", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    );
+    return r;
+  }
+
+  async function handleGerarDocumentos() {
+    setGeneratingDocs(true);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const { data: modelos } = await supabase
+        .from("modelos_contrato")
+        .select("*")
+        .in("tipo", ["compra_venda", "entrega", "desbloqueio"])
+        .eq("ativo", true);
+
+      if (!modelos || modelos.length === 0) {
+        toast.error("Nenhum modelo de documento encontrado. Rode o seed 005.");
+        setGeneratingDocs(false);
+        return;
+      }
+
+      const scooter = scooters[0] ?? null;
+      const novos = (modelos as { tipo: string; titulo: string; conteudo_template: string }[]).map(
+        (m) => ({
+          tipo: m.tipo,
+          titulo: m.titulo,
+          cliente_id: clienteId,
+          scooter_id: scooter?.id ?? null,
+          conteudo: aplicarVariaveis(m.conteudo_template, scooter),
+          status: "enviado" as const,
+          criado_por: user?.id ?? null,
+        })
+      );
+
+      const { error } = await (supabase.from("contratos") as any).insert(novos);
+      if (error) throw error;
+
+      toast.success(
+        `${novos.length} documento(s) gerado(s) e enviado(s) para assinatura.`
+      );
+      loadData();
+    } catch (err) {
+      console.error("Erro ao gerar documentos:", err);
+      toast.error("Erro ao gerar documentos");
+    } finally {
+      setGeneratingDocs(false);
+    }
   }
 
   function formatDate(dateStr: string | null) {
@@ -419,7 +499,26 @@ export default function ClienteDetailPage() {
 
             <TabsContent value="contratos">
               <Card>
-                <CardContent className="pt-4">
+                <CardContent className="pt-4 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <p className="text-xs text-muted-foreground">
+                      Gera o Contrato de Compra e Venda + 2 termos com os dados do
+                      cliente{scooters.length > 0 ? " e da scooter" : ""} e envia
+                      para o cliente assinar no app dele.
+                    </p>
+                    <Button
+                      size="sm"
+                      onClick={handleGerarDocumentos}
+                      disabled={generatingDocs}
+                    >
+                      {generatingDocs ? (
+                        <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                      ) : (
+                        <FilePlus2 className="h-4 w-4 mr-1.5" />
+                      )}
+                      Gerar documentos para assinatura
+                    </Button>
+                  </div>
                   {contratos.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-8">
                       Nenhum contrato encontrado.

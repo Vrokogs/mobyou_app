@@ -67,7 +67,7 @@ export default function ScooterDetailPage() {
     const s = scooterData as Scooter;
     setScooter(s);
 
-    const promises: Promise<unknown>[] = [
+    const promises: PromiseLike<unknown>[] = [
       supabase
         .from("garantias")
         .select("*")
@@ -196,7 +196,6 @@ export default function ScooterDetailPage() {
                   <p className="font-semibold text-lg">
                     {scooter.marca} {scooter.modelo}
                   </p>
-                  <Badge variant="secondary">{scooter.status}</Badge>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3 pt-3">
@@ -221,22 +220,11 @@ export default function ScooterDetailPage() {
                   <span className="font-mono text-xs">{scooter.numero_serie ?? "---"}</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
-                  <Gauge className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">KM:</span>
-                  <span>{scooter.km_atual} km</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Battery className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Bateria:</span>
-                  <span className="font-mono text-xs">{scooter.bateria_numero ?? "---"}</span>
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Compra:</span>
+                  <span>{scooter.data_compra ? formatDate(scooter.data_compra) : "---"}</span>
                 </div>
               </div>
-              {scooter.observacoes && (
-                <div className="pt-2">
-                  <p className="text-sm text-muted-foreground">Observacoes:</p>
-                  <p className="text-sm mt-1">{scooter.observacoes}</p>
-                </div>
-              )}
             </div>
           </CardContent>
         </Card>
@@ -329,26 +317,16 @@ export default function ScooterDetailPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Descricao</TableHead>
                       <TableHead>Inicio</TableHead>
                       <TableHead>Fim</TableHead>
-                      <TableHead>KM Limite</TableHead>
                       <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {garantias.map((g) => (
                       <TableRow key={g.id}>
-                        <TableCell className="capitalize font-medium">
-                          {g.tipo}
-                        </TableCell>
-                        <TableCell>{g.descricao ?? "---"}</TableCell>
                         <TableCell>{formatDate(g.data_inicio)}</TableCell>
                         <TableCell>{formatDate(g.data_fim)}</TableCell>
-                        <TableCell>
-                          {g.km_limite ? `${g.km_limite} km` : "---"}
-                        </TableCell>
                         <TableCell>
                           <Badge
                             variant="secondary"
@@ -469,7 +447,7 @@ export default function ScooterDetailPage() {
                           </div>
                           <div className="flex-1">
                             <p className="font-medium text-sm">
-                              Certificado #{cert.hash.slice(0, 8)}
+                              Certificado #{cert.id.slice(0, 8)}
                             </p>
                             <p className="text-xs text-muted-foreground">
                               {formatDate(cert.created_at)}

@@ -51,13 +51,17 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  const userRole = profile?.role as Role | undefined;
+  // Evita uma 2ª chamada de rede por navegação: usa o role do token (user_metadata)
+  // quando disponível; só consulta a tabela profiles como fallback.
+  let userRole = (user.user_metadata?.role as Role | undefined) ?? undefined;
+  if (!userRole) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    userRole = profile?.role as Role | undefined;
+  }
 
   if (!userRole) {
     if (isPublicRoute(pathname)) {

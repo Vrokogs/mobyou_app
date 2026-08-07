@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { Plus, Search, Eye } from "lucide-react";
+import { Plus, Search, Eye, Upload, FileText } from "lucide-react";
 import Link from "next/link";
 
 interface Cliente {
@@ -21,6 +21,31 @@ interface Cliente {
   telefone: string;
   email: string;
   ativo: boolean;
+}
+
+function extractClienteFromXml(xmlText: string) {
+  const result = { nome: "", cpf: "", telefone: "", email: "", endereco: "" };
+  try {
+    const doc = new DOMParser().parseFromString(xmlText, "text/xml");
+    const dest = doc.querySelector("dest");
+    if (!dest) return result;
+    result.nome = dest.querySelector("xNome")?.textContent || "";
+    result.cpf = dest.querySelector("CPF")?.textContent || dest.querySelector("CNPJ")?.textContent || "";
+    result.telefone = dest.querySelector("fone")?.textContent || "";
+    result.email = dest.querySelector("email")?.textContent || "";
+    const ender = dest.querySelector("enderDest");
+    if (ender) {
+      const xLgr = ender.querySelector("xLgr")?.textContent || "";
+      const nro = ender.querySelector("nro")?.textContent || "";
+      const xBairro = ender.querySelector("xBairro")?.textContent || "";
+      const xMun = ender.querySelector("xMun")?.textContent || "";
+      const UF = ender.querySelector("UF")?.textContent || "";
+      result.endereco = `${xLgr}, ${nro} - ${xBairro}, ${xMun}/${UF}`;
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return result;
 }
 
 export default function VendedorClientesPage() {
@@ -42,7 +67,7 @@ export default function VendedorClientesPage() {
       .select("id, nome, cpf, telefone, email, ativo")
       .eq("role", "cliente")
       .order("nome");
-    if (data) setClientes(data);
+    if (data) setClientes(data as unknown as Cliente[]);
     setLoading(false);
   }
 
@@ -51,33 +76,24 @@ export default function VendedorClientesPage() {
     setSaving(true);
 
     try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-
-      const { error: authError, data: authData } = await supabase.auth.admin.createUser({
-        email: form.email,
-        email_confirm: true,
-        user_metadata: { nome: form.nome, role: "cliente" },
+      const res = await fetch("/api/criar-cliente", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
       });
+      const json = await res.json();
 
-      if (authError) {
-        const { error: profileError } = await supabase.from("profiles").insert({
-          nome: form.nome,
-          cpf: form.cpf,
-          telefone: form.telefone,
-          email: form.email,
-          endereco: form.endereco,
-          role: "cliente",
-          created_by: user?.id,
+      if (!res.ok) {
+        toast.error("Erro ao cadastrar cliente", {
+          description: json.error || "Tente novamente.",
         });
-
-        if (profileError) {
-          toast.error("Erro ao cadastrar cliente", { description: profileError.message });
-          return;
-        }
+        return;
       }
 
-      toast.success("Cliente cadastrado com sucesso!");
+      toast.success("Cliente cadastrado com conta de acesso criada!", {
+        description: `Login: ${json.email} • Senha provisória: ${json.senha}`,
+        duration: 15000,
+      });
       setDialogOpen(false);
       setForm({ nome: "", cpf: "", telefone: "", email: "", endereco: "" });
       loadClientes();
@@ -86,6 +102,33 @@ export default function VendedorClientesPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleNfImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    if (ext !== "xml") {
+      toast.error("Envie o XML da NF-e para extrair automaticamente.");
+      e.target.value = "";
+      return;
+    }
+    const text = await file.text();
+    const c = extractClienteFromXml(text);
+    if (!c.nome && !c.cpf) {
+      toast.error("Nao foi possivel extrair dados do cliente deste XML.");
+      e.target.value = "";
+      return;
+    }
+    setForm((prev) => ({
+      nome: c.nome || prev.nome,
+      cpf: c.cpf || prev.cpf,
+      telefone: c.telefone || prev.telefone,
+      email: c.email || prev.email,
+      endereco: c.endereco || prev.endereco,
+    }));
+    toast.success("Dados do cliente extraidos da NF!");
+    e.target.value = "";
   }
 
   const filtered = clientes.filter(c =>
@@ -101,15 +144,53 @@ export default function VendedorClientesPage() {
           <h1 className="text-2xl font-bold">Clientes</h1>
           <p className="text-muted-foreground">Gerencie os clientes cadastrados</p>
         </div>
+        <div className="flex items-center gap-2">
+        <Button variant="outline" render={<Link href="/vendedor/importar-nf" />}>
+          <Upload className="h-4 w-4 mr-1" />
+          Cadastrar com NF
+        </Button>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button><Plus className="mr-2 h-4 w-4" />Novo Cliente</Button>
-          </DialogTrigger>
+          <DialogTrigger
+            render={
+              <Button><Plus className="mr-2 h-4 w-4" />Novo Cliente</Button>
+            }
+          />
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Cadastrar Cliente</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleCreate} className="space-y-4">
+              <div className="rounded-lg border border-dashed p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <FileText className="h-4 w-4" />
+                    <span>Preencher a partir de uma NF-e (XML)</span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => document.getElementById("nf-file-input")?.click()}
+                  >
+                    <Upload className="h-4 w-4 mr-1" />
+                    Importar NF
+                  </Button>
+                </div>
+                <input
+                  id="nf-file-input"
+                  type="file"
+                  accept=".xml"
+                  className="hidden"
+                  onChange={handleNfImport}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Para importar tambem a scooter e gerar contrato/garantia, use{" "}
+                  <Link href="/vendedor/importar-nf" className="underline text-primary">
+                    Importar NF
+                  </Link>
+                  .
+                </p>
+              </div>
               <div className="space-y-2">
                 <Label>Nome</Label>
                 <Input value={form.nome} onChange={e => setForm({...form, nome: e.target.value})} required />
@@ -138,6 +219,7 @@ export default function VendedorClientesPage() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <Card>

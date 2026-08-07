@@ -18,6 +18,8 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Activity,
+  Radar,
+  MapPin,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -47,11 +49,19 @@ interface TimelineEvent {
   created_at: string;
 }
 
+interface VendaLite {
+  origem: string | null;
+  unidade: string | null;
+  valor_total: number | null;
+}
+
 export default function GestorDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<StatCard[]>([]);
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
+  const [vendasLite, setVendasLite] = useState<VendaLite[]>([]);
+  const [leadsOrigem, setLeadsOrigem] = useState<{ origem: string | null }[]>([]);
 
   useEffect(() => {
     async function loadData() {
@@ -94,6 +104,14 @@ export default function GestorDashboardPage() {
           .order("created_at", { ascending: false })
           .limit(8),
       ]);
+
+      // Relatório de origem das vendas + leads (aba principal)
+      const [vendasOrigemRes, leadsRes] = await Promise.all([
+        supabase.from("vendas").select("origem, unidade, valor_total"),
+        supabase.from("leads").select("origem"),
+      ]);
+      setVendasLite((vendasOrigemRes.data ?? []) as unknown as VendaLite[]);
+      setLeadsOrigem((leadsRes.data ?? []) as { origem: string | null }[]);
 
       setStats([
         {
@@ -223,21 +241,6 @@ export default function GestorDashboardPage() {
               </div>
               <div className="flex items-end justify-between">
                 <span className="text-3xl font-bold">{stat.value}</span>
-                <div className="flex items-center gap-1 text-xs">
-                  {stat.trend > 0 ? (
-                    <ArrowUpRight className="h-3 w-3 text-green-600" />
-                  ) : (
-                    <ArrowDownRight className="h-3 w-3 text-red-600" />
-                  )}
-                  <span
-                    className={
-                      stat.trend > 0 ? "text-green-600" : "text-red-600"
-                    }
-                  >
-                    {Math.abs(stat.trend)}%
-                  </span>
-                  <span className="text-muted-foreground">{stat.trendLabel}</span>
-                </div>
               </div>
             </CardContent>
           </Card>
@@ -341,6 +344,81 @@ export default function GestorDashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Relatório: origem das vendas + locais */}
+      {(() => {
+        const brl = (n: number) => "R$ " + n.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
+        const origemMap: Record<string, { qtd: number; total: number }> = {};
+        for (const v of vendasLite) {
+          const o = v.origem || "Não informado";
+          origemMap[o] = origemMap[o] || { qtd: 0, total: 0 };
+          origemMap[o].qtd += 1;
+          origemMap[o].total += v.valor_total ?? 0;
+        }
+        // inclui contagem de leads por origem (potenciais)
+        for (const l of leadsOrigem) {
+          const o = l.origem || "Não informado";
+          origemMap[o] = origemMap[o] || { qtd: 0, total: 0 };
+        }
+        const origens = Object.entries(origemMap).sort((a, b) => b[1].qtd - a[1].qtd);
+        const maxOrigem = Math.max(1, ...origens.map(([, i]) => i.qtd));
+
+        const localMap: Record<string, { qtd: number; total: number }> = {};
+        for (const v of vendasLite) {
+          const u = v.unidade || "Não informado";
+          localMap[u] = localMap[u] || { qtd: 0, total: 0 };
+          localMap[u].qtd += 1;
+          localMap[u].total += v.valor_total ?? 0;
+        }
+        const locais = Object.entries(localMap).sort((a, b) => b[1].total - a[1].total);
+
+        return (
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base"><Radar className="h-4 w-4 text-primary" /> Origem das vendas & leads</CardTitle>
+                <CardDescription>De onde vêm os clientes</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {origens.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">Sem dados de origem ainda.</p>
+                ) : origens.map(([o, info]) => (
+                  <div key={o} className="space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium">{o}</span>
+                      <span className="text-muted-foreground">{info.qtd} venda(s){info.total > 0 && <> • <span className="font-semibold text-foreground">{brl(info.total)}</span></>}</span>
+                    </div>
+                    <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
+                      <div className="h-full rounded-full bg-primary/70" style={{ width: `${(info.qtd / maxOrigem) * 100}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base"><MapPin className="h-4 w-4 text-primary" /> Locais das vendas</CardTitle>
+                <CardDescription>Faturamento por unidade</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {locais.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">Nenhuma venda registrada ainda.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {locais.map(([u, info]) => (
+                      <div key={u} className="flex items-center justify-between rounded-lg border px-3 py-2">
+                        <span className="text-sm font-medium">{u}</span>
+                        <span className="text-sm text-muted-foreground">{info.qtd}x • <span className="font-semibold text-foreground">{brl(info.total)}</span></span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
     </div>
   );
 }

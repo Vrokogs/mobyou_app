@@ -39,13 +39,26 @@ interface TimelineEvento {
 
 interface Orcamento {
   id: string;
-  pecas: Array<{ nome: string; quantidade: number; preco_unitario: number }>;
-  servicos: Array<{ descricao: string; preco: number }>;
-  mao_de_obra: number;
-  custos_adicionais: number;
-  valor_total: number;
+  pecas: Array<Record<string, unknown>> | null;
+  servicos: Array<Record<string, unknown>> | null;
+  mao_de_obra: number | null;
+  custos_adicionais: number | null;
+  valor_total: number | null;
   prazo_estimado: string | null;
   status: string;
+}
+
+// Os itens do orçamento são JSONB (formato livre). Lê valores com segurança.
+function num(v: unknown): number {
+  if (typeof v === "number") return v;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+function money(v: unknown): string {
+  return num(v).toFixed(2);
+}
+function txt(v: unknown): string {
+  return v == null ? "" : String(v);
 }
 
 interface Foto {
@@ -150,25 +163,20 @@ export default function ClienteOrdemDetailPage() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
 
-      if (orcamento) {
-        await supabase.from("orcamentos").update({
-          status: approved ? "aprovado" : "rejeitado",
-          aprovado_por: approved ? user?.id : null,
-          data_aprovacao: new Date().toISOString(),
-        }).eq("id", orcamento.id);
+      if (!orcamento) {
+        toast.error("Orçamento não encontrado");
+        return;
       }
 
-      await supabase.from("ordens_servico").update({
-        status: approved ? "aprovado" : "cancelado",
-      }).eq("id", id);
+      // O cliente só pode atualizar o próprio orçamento (RLS). A atualização da
+      // OS e o evento na timeline são feitos por trigger no banco (migration 007).
+      const { error } = await supabase.from("orcamentos").update({
+        status: approved ? "aprovado" : "rejeitado",
+        aprovado_por: approved ? user?.id : null,
+        data_aprovacao: approved ? new Date().toISOString() : null,
+      }).eq("id", orcamento.id);
 
-      await supabase.from("timeline_eventos").insert({
-        ordem_id: id,
-        tipo: approved ? "aprovacao" : "rejeicao",
-        titulo: approved ? "Orçamento Aprovado" : "Orçamento Rejeitado",
-        descricao: approved ? "Cliente aprovou o orçamento" : "Cliente rejeitou o orçamento",
-        responsavel_id: user?.id,
-      });
+      if (error) throw error;
 
       toast.success(approved ? "Orçamento aprovado!" : "Orçamento rejeitado");
       loadData();
@@ -268,12 +276,20 @@ export default function ClienteOrdemDetailPage() {
             {orcamento.pecas && orcamento.pecas.length > 0 && (
               <div>
                 <h4 className="font-medium text-sm mb-2">Peças</h4>
-                {orcamento.pecas.map((p, i) => (
-                  <div key={i} className="flex justify-between text-sm py-1">
-                    <span>{p.nome} (x{p.quantidade})</span>
-                    <span>R$ {(p.preco_unitario * p.quantidade).toFixed(2)}</span>
-                  </div>
-                ))}
+                {orcamento.pecas.map((p, i) => {
+                  const qtd = num(p.quantidade ?? p.qtd);
+                  const unit = num(p.preco_unitario ?? p.valor ?? p.preco);
+                  const total = qtd > 0 ? unit * qtd : unit;
+                  return (
+                    <div key={i} className="flex justify-between text-sm py-1">
+                      <span>
+                        {txt(p.nome ?? p.descricao) || "Peça"}
+                        {qtd > 0 ? ` (x${qtd})` : ""}
+                      </span>
+                      <span>R$ {money(total)}</span>
+                    </div>
+                  );
+                })}
               </div>
             )}
             {orcamento.servicos && orcamento.servicos.length > 0 && (
@@ -281,29 +297,29 @@ export default function ClienteOrdemDetailPage() {
                 <h4 className="font-medium text-sm mb-2">Serviços</h4>
                 {orcamento.servicos.map((s, i) => (
                   <div key={i} className="flex justify-between text-sm py-1">
-                    <span>{s.descricao}</span>
-                    <span>R$ {s.preco.toFixed(2)}</span>
+                    <span>{txt(s.descricao ?? s.nome) || "Serviço"}</span>
+                    <span>R$ {money(s.preco ?? s.valor)}</span>
                   </div>
                 ))}
               </div>
             )}
             <Separator />
-            {orcamento.mao_de_obra > 0 && (
+            {num(orcamento.mao_de_obra) > 0 && (
               <div className="flex justify-between text-sm">
                 <span>Mão de Obra</span>
-                <span>R$ {orcamento.mao_de_obra.toFixed(2)}</span>
+                <span>R$ {money(orcamento.mao_de_obra)}</span>
               </div>
             )}
-            {orcamento.custos_adicionais > 0 && (
+            {num(orcamento.custos_adicionais) > 0 && (
               <div className="flex justify-between text-sm">
                 <span>Custos Adicionais</span>
-                <span>R$ {orcamento.custos_adicionais.toFixed(2)}</span>
+                <span>R$ {money(orcamento.custos_adicionais)}</span>
               </div>
             )}
             <Separator />
             <div className="flex justify-between font-bold text-lg">
               <span>Total</span>
-              <span>R$ {orcamento.valor_total.toFixed(2)}</span>
+              <span>R$ {money(orcamento.valor_total)}</span>
             </div>
             {orcamento.prazo_estimado && (
               <p className="text-sm text-muted-foreground flex items-center gap-1">

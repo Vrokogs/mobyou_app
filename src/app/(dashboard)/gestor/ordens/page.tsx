@@ -22,6 +22,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandItem,
+} from "@/components/ui/command";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -33,6 +45,8 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { DateTimePicker } from "@/components/ui/datetime-picker";
+import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import {
   ORDER_STATUS_LABELS,
@@ -50,8 +64,8 @@ import {
   Eye,
   Loader2,
   ClipboardList,
-  Calendar,
-  Filter,
+  Check,
+  ChevronsUpDown,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -80,7 +94,8 @@ export default function OrdensPage() {
 
   // New OS dialog
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [clientes, setClientes] = useState<Pick<Profile, "id" | "nome">[]>([]);
+  const [clientePopoverOpen, setClientePopoverOpen] = useState(false);
+  const [clientes, setClientes] = useState<Pick<Profile, "id" | "nome" | "cpf">[]>([]);
   const [scootersCliente, setScootersCliente] = useState<
     Pick<Scooter, "id" | "modelo" | "chassi">[]
   >([]);
@@ -118,13 +133,13 @@ export default function OrdensPage() {
         query = query.gte("data_agendamento", dateFrom);
       }
       if (dateTo) {
-        query = query.lte("data_agendamento", dateTo);
+        query = query.lte("data_agendamento", `${dateTo}T23:59:59`);
       }
 
       const { data, error } = await query;
       if (error) throw error;
 
-      setOrdens((data as OrdemWithRelations[]) || []);
+      setOrdens((data as unknown as OrdemWithRelations[]) || []);
     } catch (err) {
       console.error("Erro ao carregar ordens:", err);
       toast.error("Erro ao carregar ordens de servico");
@@ -154,7 +169,7 @@ export default function OrdensPage() {
       const supabase = createClient();
       const { data } = await supabase
         .from("profiles")
-        .select("id, nome")
+        .select("id, nome, cpf")
         .eq("role", "cliente")
         .eq("ativo", true)
         .order("nome");
@@ -243,8 +258,25 @@ export default function OrdensPage() {
 
   function formatDate(dateStr: string | null) {
     if (!dateStr) return "-";
-    return new Date(dateStr).toLocaleDateString("pt-BR");
+    return new Date(dateStr).toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   }
+
+  function formatCpf(cpf: string | null) {
+    if (!cpf) return "";
+    const d = cpf.replace(/\D/g, "");
+    if (d.length === 11) {
+      return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+    }
+    return cpf;
+  }
+
+  const selectedCliente = clientes.find((c) => c.id === newOS.cliente_id);
 
   return (
     <div className="space-y-6">
@@ -450,38 +482,72 @@ export default function OrdensPage() {
           <div className="space-y-4 py-2">
             <div>
               <Label className="text-sm font-medium">Cliente</Label>
-              <Select
-                value={newOS.cliente_id}
-                onValueChange={(val) => {
-                  if (!val) return;
-                  setNewOS((prev) => ({
-                    ...prev,
-                    cliente_id: val,
-                    scooter_id: "",
-                  }));
-                  loadScootersForCliente(val);
-                }}
-              >
-                <SelectTrigger className="w-full mt-1">
-                  <SelectValue
-                    placeholder={
-                      loadingClientes ? "Carregando..." : "Selecione o cliente"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {clientes.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={clientePopoverOpen} onOpenChange={setClientePopoverOpen}>
+                <PopoverTrigger
+                  render={
+                    <Button
+                      variant="outline"
+                      className="w-full mt-1 justify-between font-normal"
+                    >
+                      <span className={cn(!selectedCliente && "text-muted-foreground")}>
+                        {selectedCliente
+                          ? selectedCliente.nome
+                          : loadingClientes
+                            ? "Carregando..."
+                            : "Buscar e selecionar cliente"}
+                      </span>
+                      <ChevronsUpDown className="h-4 w-4 opacity-50" />
+                    </Button>
+                  }
+                />
+                <PopoverContent className="w-[var(--anchor-width)] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Buscar por nome ou CPF..." />
+                    <CommandList>
+                      <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+                      {clientes.map((c) => (
+                        <CommandItem
+                          key={c.id}
+                          value={`${c.nome} ${c.cpf ?? ""}`}
+                          onSelect={() => {
+                            setNewOS((prev) => ({
+                              ...prev,
+                              cliente_id: c.id,
+                              scooter_id: "",
+                            }));
+                            loadScootersForCliente(c.id);
+                            setClientePopoverOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "h-4 w-4",
+                              newOS.cliente_id === c.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          <div className="flex flex-col">
+                            <span>{c.nome}</span>
+                            {c.cpf && (
+                              <span className="text-xs text-muted-foreground">
+                                {formatCpf(c.cpf)}
+                              </span>
+                            )}
+                          </div>
+                        </CommandItem>
+                      ))}
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div>
               <Label className="text-sm font-medium">Scooter</Label>
               <Select
+                items={scootersCliente.map((s) => ({
+                  value: s.id,
+                  label: `${s.modelo}${s.chassi ? ` - ${s.chassi}` : ""}`,
+                }))}
                 value={newOS.scooter_id}
                 onValueChange={(val) =>
                   val && setNewOS((prev) => ({ ...prev, scooter_id: val }))
@@ -511,18 +577,16 @@ export default function OrdensPage() {
             </div>
 
             <div>
-              <Label className="text-sm font-medium">Data Agendamento</Label>
-              <Input
-                type="date"
-                value={newOS.data_agendamento}
-                onChange={(e) =>
-                  setNewOS((prev) => ({
-                    ...prev,
-                    data_agendamento: e.target.value,
-                  }))
-                }
-                className="mt-1"
-              />
+              <Label className="text-sm font-medium">Data e Hora do Agendamento</Label>
+              <div className="mt-1">
+                <DateTimePicker
+                  value={newOS.data_agendamento}
+                  onChange={(val) =>
+                    setNewOS((prev) => ({ ...prev, data_agendamento: val }))
+                  }
+                  placeholder="Selecione o dia e o horario"
+                />
+              </div>
             </div>
 
             <div>

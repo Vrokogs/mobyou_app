@@ -65,7 +65,7 @@ export default function FinanceiroPage() {
       .lte("data_venda", endDate)
       .order("data_venda", { ascending: false });
 
-    setVendas((vendasData ?? []) as VendaRow[]);
+    setVendas((vendasData ?? []) as unknown as VendaRow[]);
 
     // Orcamentos aprovados (servicos) no mes
     const { data: orcData } = await supabase

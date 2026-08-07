@@ -26,9 +26,10 @@ import {
   DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Search, Eye, Pencil, Users } from "lucide-react";
+import { Plus, Search, Eye, Pencil, Users, Upload, FileText } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { toast } from "sonner";
 import type { Profile } from "@/types/database";
 
 const clienteSchema = z.object({
@@ -40,6 +41,39 @@ const clienteSchema = z.object({
 });
 
 type ClienteFormData = z.infer<typeof clienteSchema>;
+
+interface ClienteFromNf {
+  nome: string;
+  cpf: string;
+  telefone: string;
+  email: string;
+  endereco: string;
+}
+
+function extractClienteFromXml(xmlText: string): ClienteFromNf {
+  const result: ClienteFromNf = { nome: "", cpf: "", telefone: "", email: "", endereco: "" };
+  try {
+    const doc = new DOMParser().parseFromString(xmlText, "text/xml");
+    const dest = doc.querySelector("dest");
+    if (!dest) return result;
+    result.nome = dest.querySelector("xNome")?.textContent || "";
+    result.cpf = dest.querySelector("CPF")?.textContent || dest.querySelector("CNPJ")?.textContent || "";
+    result.telefone = dest.querySelector("fone")?.textContent || "";
+    result.email = dest.querySelector("email")?.textContent || "";
+    const ender = dest.querySelector("enderDest");
+    if (ender) {
+      const xLgr = ender.querySelector("xLgr")?.textContent || "";
+      const nro = ender.querySelector("nro")?.textContent || "";
+      const xBairro = ender.querySelector("xBairro")?.textContent || "";
+      const xMun = ender.querySelector("xMun")?.textContent || "";
+      const UF = ender.querySelector("UF")?.textContent || "";
+      result.endereco = `${xLgr}, ${nro} - ${xBairro}, ${xMun}/${UF}`;
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return result;
+}
 
 export default function ClientesPage() {
   const [clientes, setClientes] = useState<Profile[]>([]);
@@ -53,8 +87,34 @@ export default function ClientesPage() {
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<ClienteFormData>();
+
+  async function handleNfImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    if (ext !== "xml") {
+      toast.error("Envie o XML da NF-e para extrair automaticamente.");
+      e.target.value = "";
+      return;
+    }
+    const text = await file.text();
+    const c = extractClienteFromXml(text);
+    if (!c.nome && !c.cpf) {
+      toast.error("Nao foi possivel extrair dados do cliente deste XML.");
+      e.target.value = "";
+      return;
+    }
+    if (c.nome) setValue("nome", c.nome);
+    if (c.cpf) setValue("cpf", c.cpf);
+    if (c.telefone) setValue("telefone", c.telefone);
+    if (c.email) setValue("email", c.email);
+    if (c.endereco) setValue("endereco", c.endereco);
+    toast.success("Dados do cliente extraidos da NF!");
+    e.target.value = "";
+  }
 
   const loadClientes = useCallback(async () => {
     const supabase = createClient();
@@ -99,57 +159,34 @@ export default function ClientesPage() {
 
   async function onSubmit(formData: ClienteFormData) {
     setSaving(true);
-    const supabase = createClient();
-
-    const { data: authData, error: authError } =
-      await supabase.auth.admin.createUser({
-        email: formData.email,
-        email_confirm: true,
-        user_metadata: { nome: formData.nome },
+    try {
+      const res = await fetch("/api/criar-cliente", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
       });
+      const json = await res.json();
 
-    if (authError) {
-      const { error: profileError } = await supabase.from("profiles").insert({
-        id: crypto.randomUUID(),
-        email: formData.email,
-        nome: formData.nome,
-        cpf: formData.cpf,
-        telefone: formData.telefone,
-        endereco: formData.endereco || null,
-        role: "cliente" as const,
-        ativo: true,
-        avatar_url: null,
-        cidade: null,
-        estado: null,
-        cep: null,
-      });
-
-      if (profileError) {
-        console.error("Erro ao criar cliente:", profileError);
+      if (!res.ok) {
+        toast.error("Erro ao cadastrar cliente", {
+          description: json.error || "Tente novamente.",
+        });
         setSaving(false);
         return;
       }
-    } else if (authData.user) {
-      await supabase.from("profiles").upsert({
-        id: authData.user.id,
-        email: formData.email,
-        nome: formData.nome,
-        cpf: formData.cpf,
-        telefone: formData.telefone,
-        endereco: formData.endereco || null,
-        role: "cliente" as const,
-        ativo: true,
-        avatar_url: null,
-        cidade: null,
-        estado: null,
-        cep: null,
-      });
-    }
 
-    reset();
-    setDialogOpen(false);
-    setSaving(false);
-    loadClientes();
+      toast.success("Cliente cadastrado com conta de acesso criada!", {
+        description: `Login: ${json.email} • Senha provisória: ${json.senha}`,
+        duration: 15000,
+      });
+      reset();
+      setDialogOpen(false);
+      loadClientes();
+    } catch {
+      toast.error("Erro inesperado ao cadastrar cliente");
+    } finally {
+      setSaving(false);
+    }
   }
 
   function formatCpf(cpf: string | null) {
@@ -189,6 +226,11 @@ export default function ClientesPage() {
             Gerencie os clientes cadastrados no sistema.
           </p>
         </div>
+        <div className="flex items-center gap-2">
+        <Button variant="outline" render={<Link href="/gestor/importar-nf" />}>
+          <Upload className="h-4 w-4 mr-1" />
+          Cadastrar com NF
+        </Button>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger
             render={
@@ -206,6 +248,37 @@ export default function ClientesPage() {
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              <div className="rounded-lg border border-dashed p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <FileText className="h-4 w-4" />
+                    <span>Preencher a partir de uma NF-e (XML)</span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => document.getElementById("nf-file-input")?.click()}
+                  >
+                    <Upload className="h-4 w-4 mr-1" />
+                    Importar NF
+                  </Button>
+                </div>
+                <input
+                  id="nf-file-input"
+                  type="file"
+                  accept=".xml"
+                  className="hidden"
+                  onChange={handleNfImport}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Para importar tambem a scooter e gerar contrato/garantia, use{" "}
+                  <Link href="/gestor/importar-nf" className="underline text-primary">
+                    Importar NF
+                  </Link>
+                  .
+                </p>
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="nome">Nome completo</Label>
                 <Input
@@ -271,6 +344,7 @@ export default function ClientesPage() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="flex items-center gap-2 max-w-sm">

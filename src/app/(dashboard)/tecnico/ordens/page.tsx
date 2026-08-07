@@ -53,7 +53,7 @@ export default function TecnicoOrdensPage() {
         .eq("tecnico_id", user.id)
         .order("created_at", { ascending: false });
 
-      if (data) setOrdens(data as Ordem[]);
+      if (data) setOrdens(data as unknown as Ordem[]);
       setLoading(false);
     }
     load();

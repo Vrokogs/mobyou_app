@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { createClient } from "@/lib/supabase/client";
-import { Bike, ShieldCheck, MapPin, Calendar, Hash } from "lucide-react";
+import { Bike, ShieldCheck, MapPin, Calendar, Hash, Battery, Cpu, Cog } from "lucide-react";
 
 interface ScooterFull {
   id: string;
@@ -43,18 +43,41 @@ export default function ClienteScooterPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!scooterId) return;
     async function load() {
+      setLoading(true);
       const supabase = createClient();
+
+      // Sem ?id= (ex.: menu lateral): usa a scooter do cliente logado.
+      let sid = scooterId;
+      if (!sid) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: minha } = await supabase
+            .from("scooters")
+            .select("id")
+            .eq("cliente_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          sid = (minha as { id?: string } | null)?.id ?? null;
+        }
+      }
+
+      if (!sid) {
+        setScooter(null);
+        setLoading(false);
+        return;
+      }
+
       const [scooterRes, garantiaRes, kmRes] = await Promise.all([
-        supabase.from("scooters").select("*").eq("id", scooterId).single(),
-        supabase.from("garantias").select("id, status, data_inicio, data_fim").eq("scooter_id", scooterId).order("created_at", { ascending: false }).limit(1).single(),
-        supabase.from("km_historico").select("id, km, created_at").eq("scooter_id", scooterId).order("created_at", { ascending: false }).limit(20),
+        supabase.from("scooters").select("*").eq("id", sid).maybeSingle(),
+        supabase.from("garantias").select("id, status, data_inicio, data_fim").eq("scooter_id", sid).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+        supabase.from("km_historico").select("id, km, created_at").eq("scooter_id", sid).order("created_at", { ascending: false }).limit(20),
       ]);
 
-      if (scooterRes.data) setScooter(scooterRes.data);
-      if (garantiaRes.data) setGarantia(garantiaRes.data);
-      if (kmRes.data) setKmHistory(kmRes.data);
+      if (scooterRes.data) setScooter(scooterRes.data as unknown as ScooterFull);
+      if (garantiaRes.data) setGarantia(garantiaRes.data as unknown as GarantiaInfo);
+      if (kmRes.data) setKmHistory(kmRes.data as unknown as KmEntry[]);
       setLoading(false);
     }
     load();
@@ -154,6 +177,29 @@ export default function ClienteScooterPage() {
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Fim</span>
                   <span>{new Date(garantia.data_fim).toLocaleDateString("pt-BR")}</span>
+                </div>
+                <Separator />
+                <div>
+                  <p className="text-sm font-medium mb-2">Cobertura — 1 ano</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="rounded-lg border bg-emerald-50/50 p-3 text-center">
+                      <Battery className="h-5 w-5 mx-auto text-emerald-600" />
+                      <p className="text-xs font-medium mt-1">Bateria</p>
+                    </div>
+                    <div className="rounded-lg border bg-emerald-50/50 p-3 text-center">
+                      <Cpu className="h-5 w-5 mx-auto text-emerald-600" />
+                      <p className="text-xs font-medium mt-1">Módulo</p>
+                    </div>
+                    <div className="rounded-lg border bg-emerald-50/50 p-3 text-center">
+                      <Cog className="h-5 w-5 mx-auto text-emerald-600" />
+                      <p className="text-xs font-medium mt-1">Motor</p>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-2">
+                    Garantia de 1 ano contra defeitos de fabricação do módulo, motor e
+                    bateria. Não cobre peças de desgaste (pneus, freios, lâmpadas e
+                    carregadores) nem danos por mau uso ou modificações.
+                  </p>
                 </div>
                 {garantiaAtiva && (
                   <>

@@ -85,7 +85,7 @@ export default function ContratoDetailPage() {
         : Promise.resolve({ data: null }),
       (supabase
         .from("assinaturas") as any)
-        .select("*, signatario:profiles!signatario_id(nome)")
+        .select("*, signatario:profiles!assinante_id(nome)")
         .eq("contrato_id", contratoId)
         .order("created_at"),
     ]);
@@ -125,21 +125,9 @@ export default function ContratoDetailPage() {
     setSaving(true);
     const supabase = createClient();
 
-    const updates: Record<string, string | null> = {
-      status: newStatus,
-    };
-
-    if (newStatus === "enviado") {
-      updates.data_envio = new Date().toISOString();
-    } else if (newStatus === "visualizado") {
-      updates.data_visualizacao = new Date().toISOString();
-    } else if (newStatus === "assinado") {
-      updates.data_assinatura = new Date().toISOString();
-    }
-
     const { error } = await (supabase
       .from("contratos") as any)
-      .update(updates)
+      .update({ status: newStatus })
       .eq("id", contrato.id);
 
     if (error) {
@@ -159,7 +147,7 @@ export default function ContratoDetailPage() {
 
     const { error } = await (supabase
       .from("contratos") as any)
-      .update({ status: "enviado" as ContratoStatus, data_envio: new Date().toISOString() })
+      .update({ status: "enviado" as ContratoStatus })
       .eq("id", contrato.id);
 
     if (error) {
@@ -221,8 +209,8 @@ export default function ContratoDetailPage() {
           </Button>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{contrato.titulo}</h1>
-            <p className="text-muted-foreground text-sm">
-              {contrato.numero}
+            <p className="text-muted-foreground text-sm font-mono">
+              #{contrato.id.slice(0, 8)}
             </p>
           </div>
           <Badge
@@ -290,26 +278,77 @@ export default function ContratoDetailPage() {
                 </p>
               ) : (
                 <div className="space-y-4">
-                  {assinaturas.map((assinatura) => (
-                    <div key={assinatura.id} className="flex items-center justify-between p-4 border rounded-lg bg-green-50">
-                      <div className="flex items-center gap-3">
-                        <CheckCircle2 className="h-5 w-5 text-green-600" />
-                        <div>
-                          <p className="font-medium">{assinatura.nome}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {assinatura.tipo === "cliente" ? "Cliente" : assinatura.tipo === "empresa" ? "Empresa" : "Testemunha"}
-                            {assinatura.cpf && ` - CPF: ${assinatura.cpf}`}
-                          </p>
+                  {assinaturas.map((assinatura) => {
+                    const a = assinatura as unknown as {
+                      id: string;
+                      nome_assinante?: string | null;
+                      cpf?: string | null;
+                      data_assinatura?: string | null;
+                      ip_address?: string | null;
+                      navegador?: string | null;
+                      sistema_operacional?: string | null;
+                      dispositivo?: string | null;
+                      assinatura_imagem?: string | null;
+                      rubrica_imagem?: string | null;
+                      documento_hash?: string | null;
+                      signatario?: { nome: string } | null;
+                    };
+                    return (
+                      <div key={a.id} className="p-4 border rounded-lg bg-green-50/60 space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+                            <div>
+                              <p className="font-medium">
+                                {a.nome_assinante || a.signatario?.nome || "Assinante"}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Cliente{a.cpf ? ` • CPF: ${a.cpf}` : ""}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right text-xs text-muted-foreground">
+                            <p>{formatDate(a.data_assinatura ?? null)}</p>
+                            {a.ip_address && <p>IP: {a.ip_address}</p>}
+                            {(a.navegador || a.dispositivo) && (
+                              <p>
+                                {[a.navegador, a.sistema_operacional, a.dispositivo]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                      <div className="text-right text-sm text-muted-foreground">
-                        <p>{formatDate(assinatura.assinado_em)}</p>
-                        {assinatura.ip_address && (
-                          <p className="text-xs">IP: {assinatura.ip_address}</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          {a.assinatura_imagem && (
+                            <div className="sm:col-span-2">
+                              <p className="text-[11px] text-muted-foreground mb-1">Assinatura</p>
+                              <img
+                                src={a.assinatura_imagem}
+                                alt="Assinatura"
+                                className="h-24 w-full object-contain rounded border bg-white"
+                              />
+                            </div>
+                          )}
+                          {a.rubrica_imagem && (
+                            <div>
+                              <p className="text-[11px] text-muted-foreground mb-1">Rubrica</p>
+                              <img
+                                src={a.rubrica_imagem}
+                                alt="Rubrica"
+                                className="h-24 w-full object-contain rounded border bg-white"
+                              />
+                            </div>
+                          )}
+                        </div>
+                        {a.documento_hash && (
+                          <p className="text-[10px] text-muted-foreground break-all">
+                            Hash de integridade (SHA-256): {a.documento_hash}
+                          </p>
                         )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
@@ -363,22 +402,16 @@ export default function ContratoDetailPage() {
                   <Clock className="h-3 w-3 text-muted-foreground" />
                   <span>Criado: {formatDate(contrato.created_at)}</span>
                 </div>
-                {contrato.data_envio && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Send className="h-3 w-3 text-blue-500" />
-                    <span>Enviado: {formatDate(contrato.data_envio)}</span>
-                  </div>
-                )}
-                {contrato.data_visualizacao && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Eye className="h-3 w-3 text-yellow-600" />
-                    <span>Visualizado: {formatDate(contrato.data_visualizacao)}</span>
-                  </div>
-                )}
-                {contrato.data_assinatura && (
+                {assinaturas.length > 0 && (
                   <div className="flex items-center gap-2 text-sm">
                     <CheckCircle2 className="h-3 w-3 text-green-600" />
-                    <span>Assinado: {formatDate(contrato.data_assinatura)}</span>
+                    <span>
+                      Assinado:{" "}
+                      {formatDate(
+                        (assinaturas[0] as unknown as { data_assinatura?: string | null })
+                          .data_assinatura ?? null
+                      )}
+                    </span>
                   </div>
                 )}
               </div>

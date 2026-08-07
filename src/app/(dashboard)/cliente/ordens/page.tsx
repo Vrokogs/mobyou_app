@@ -63,7 +63,7 @@ export default function ClienteOrdensPage() {
       supabase.from("scooters").select("id, modelo, chassi").eq("cliente_id", user.id),
     ]);
 
-    if (ordensRes.data) setOrdens(ordensRes.data as Ordem[]);
+    if (ordensRes.data) setOrdens(ordensRes.data as unknown as Ordem[]);
     if (scootersRes.data) setScooters(scootersRes.data);
     setLoading(false);
   }
@@ -101,9 +101,11 @@ export default function ClienteOrdensPage() {
           <p className="text-muted-foreground">Acompanhe e solicite manutenções</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button><Plus className="mr-2 h-4 w-4" />Solicitar Manutenção</Button>
-          </DialogTrigger>
+          <DialogTrigger
+            render={
+              <Button><Plus className="mr-2 h-4 w-4" />Solicitar Manutenção</Button>
+            }
+          />
           <DialogContent>
             <DialogHeader><DialogTitle>Solicitar Manutenção</DialogTitle></DialogHeader>
             <form onSubmit={handleSolicitar} className="space-y-4">

@@ -81,17 +81,46 @@ export const CHECKIN_CLASSIFICATIONS = [
   { value: 'ausente', label: 'Ausente' },
 ] as const;
 
+// Tipos de foto - DEVEM corresponder ao enum foto_tipo do banco
+// (frente, traseira, lateral_direita, lateral_esquerda, painel, chassi, km,
+//  diagnostico, servico) + 'avaria' (migration 004)
 export const FOTO_TIPOS = [
-  { value: 'checkin_frente', label: 'Check-in - Frente' },
-  { value: 'checkin_traseira', label: 'Check-in - Traseira' },
-  { value: 'checkin_lateral_esquerda', label: 'Check-in - Lateral Esquerda' },
-  { value: 'checkin_lateral_direita', label: 'Check-in - Lateral Direita' },
-  { value: 'checkin_painel', label: 'Check-in - Painel' },
-  { value: 'checkin_dano', label: 'Check-in - Dano' },
+  { value: 'km', label: 'KM' },
+  { value: 'avaria', label: 'Avaria' },
+  { value: 'frente', label: 'Frente' },
+  { value: 'lateral_direita', label: 'Lateral Direita' },
+  { value: 'lateral_esquerda', label: 'Lateral Esquerda' },
+  { value: 'traseira', label: 'Traseira' },
+  { value: 'painel', label: 'Painel' },
+  { value: 'chassi', label: 'Chassi' },
   { value: 'diagnostico', label: 'Diagnostico' },
   { value: 'servico', label: 'Servico' },
-  { value: 'finalizado', label: 'Finalizado' },
-  { value: 'entrega', label: 'Entrega' },
+] as const;
+
+// Check-in fotografico em 3 etapas
+export const FOTO_ETAPAS = [
+  {
+    grupo: 'km',
+    titulo: 'KM (Hodometro)',
+    descricao: 'Foto da quilometragem atual no painel',
+    tipos: [{ value: 'km', label: 'KM' }],
+  },
+  {
+    grupo: 'avarias',
+    titulo: 'Avarias',
+    descricao: 'Marcas, amassos, batidas ou falta de material',
+    tipos: [{ value: 'avaria', label: 'Avaria' }],
+  },
+  {
+    grupo: 'laterais_frente',
+    titulo: 'Laterais e Frente',
+    descricao: 'Frente e laterais da scooter',
+    tipos: [
+      { value: 'frente', label: 'Frente' },
+      { value: 'lateral_direita', label: 'Lateral Direita' },
+      { value: 'lateral_esquerda', label: 'Lateral Esquerda' },
+    ],
+  },
 ] as const;
 
 export const ROLES: { value: Role; label: string }[] = [
@@ -121,4 +150,86 @@ export const CONTRATO_STATUS: Record<ContratoStatus, string> = {
   visualizado: 'Visualizado',
   assinado: 'Assinado',
   cancelado: 'Cancelado',
+};
+
+// Catalogo de modelos MOBYOU
+export const MOBYOU_MARCA = 'Mobyou';
+
+export const MOBYOU_MODELOS = [
+  'Mobyou Beach X11',
+  'Mobyou X13',
+  'Mobyou X14',
+  'Mobyou Lola',
+  'Mobyou Triciclo',
+  'Mobyou Triciclo Wave',
+  'Mobyou T6 Plus',
+  'Mobyou Frankfurt',
+  'Mobyou Bolin',
+  'Bike Atlanta',
+  'Mobyou Migo',
+  'Mobyou Bibi',
+  'Mobyou Fyron',
+] as const;
+
+export type MobyouModelo = (typeof MOBYOU_MODELOS)[number];
+
+// Unidades (lojas) para o estoque de motos
+export const GALPAO_UNIDADE = 'Galpão Central (motos em caixa)';
+
+export const UNIDADES_ESTOQUE = [
+  'São Sebastião - Pontal',
+  'Boiçucanga',
+  'Caraguatatuba Shopping',
+  GALPAO_UNIDADE,
+] as const;
+
+// Lojas de venda (não incluem o galpão)
+export const UNIDADES_VENDA = [
+  'São Sebastião - Pontal',
+  'Boiçucanga',
+  'Caraguatatuba Shopping',
+] as const;
+
+// Estado/condição da moto no estoque
+export const ESTOQUE_ESTADOS = [
+  'Disponível',
+  'Montada',
+  'Para montar',
+  'Em caixa',
+  'Reservada',
+  'Vendido',
+  'Avariada',
+] as const;
+
+// Origem do lead / da venda (de onde veio o cliente)
+export const ORIGEM_VENDA = [
+  'Lead',
+  'Passeando no shopping',
+  'Anúncios',
+  'Rádio',
+  'Indicação',
+  'Redes sociais',
+  'Outros',
+] as const;
+
+export type OrigemVenda = (typeof ORIGEM_VENDA)[number];
+
+// Montagem de motos: valor cobrado por hora de serviço
+export const VALOR_HORA_MONTAGEM = 250;
+
+// Folha de ponto: horário padrão de entrada e tolerância (minutos)
+export const PONTO_ENTRADA_PADRAO = '08:00';
+export const PONTO_TOLERANCIA_MIN = 10;
+
+export const LEAD_STATUS: Record<string, string> = {
+  novo: 'Novo',
+  em_contato: 'Em contato',
+  convertido: 'Convertido',
+  perdido: 'Perdido',
+};
+
+export const MONTAGEM_STATUS: Record<string, string> = {
+  agendada: 'Agendada',
+  em_montagem: 'Em montagem',
+  concluida: 'Concluída',
 };

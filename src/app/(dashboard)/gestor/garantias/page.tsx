@@ -69,7 +69,7 @@ export default function GarantiasPage() {
     }
 
     const { data } = await query;
-    setGarantias((data ?? []) as GarantiaWithRelations[]);
+    setGarantias((data ?? []) as unknown as GarantiaWithRelations[]);
     setLoading(false);
   }, [statusFilter]);
 

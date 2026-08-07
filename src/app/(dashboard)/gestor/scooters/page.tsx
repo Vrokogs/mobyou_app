@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, Search, Eye, Pencil, Bike } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
+import { MOBYOU_MODELOS, MOBYOU_MARCA } from "@/lib/constants";
 import type { Scooter, Profile, GarantiaStatus } from "@/types/database";
 
 interface ScooterFormData {
@@ -62,7 +63,7 @@ export default function ScootersPage() {
   const [saving, setSaving] = useState(false);
 
   const { register, handleSubmit, reset, control, formState: { errors } } =
-    useForm<ScooterFormData>();
+    useForm<ScooterFormData>({ defaultValues: { marca: MOBYOU_MARCA } });
 
   const loadScooters = useCallback(async () => {
     const supabase = createClient();
@@ -79,7 +80,7 @@ export default function ScootersPage() {
     }
 
     const { data: scooterData } = await query;
-    const scooterList = (scooterData ?? []) as ScooterWithOwner[];
+    const scooterList = (scooterData ?? []) as unknown as ScooterWithOwner[];
 
     // Load garantia status for each scooter
     if (scooterList.length > 0) {
@@ -114,7 +115,7 @@ export default function ScootersPage() {
       .eq("role", "cliente")
       .eq("ativo", true)
       .order("nome", { ascending: true });
-    setClientes((data ?? []) as Profile[]);
+    setClientes((data ?? []) as unknown as Profile[]);
   }, []);
 
   useEffect(() => {
@@ -137,7 +138,7 @@ export default function ScootersPage() {
       data_compra: formData.data_compra || null,
     });
 
-    reset();
+    reset({ marca: MOBYOU_MARCA });
     setDialogOpen(false);
     setSaving(false);
     loadScooters();
@@ -205,10 +206,24 @@ export default function ScootersPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="modelo">Modelo</Label>
-                  <Input
-                    id="modelo"
-                    placeholder="Ex: S1 Pro"
-                    {...register("modelo", { required: "Modelo obrigatorio" })}
+                  <Controller
+                    name="modelo"
+                    control={control}
+                    rules={{ required: "Modelo obrigatorio" }}
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Selecione o modelo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {MOBYOU_MODELOS.map((m) => (
+                            <SelectItem key={m} value={m}>
+                              {m}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   />
                   {errors.modelo && (
                     <p className="text-xs text-destructive">{errors.modelo.message}</p>
@@ -218,7 +233,7 @@ export default function ScootersPage() {
                   <Label htmlFor="marca">Marca</Label>
                   <Input
                     id="marca"
-                    placeholder="Ex: NIU"
+                    placeholder="Ex: Mobyou"
                     {...register("marca", { required: "Marca obrigatoria" })}
                   />
                   {errors.marca && (

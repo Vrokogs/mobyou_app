@@ -64,7 +64,7 @@ export default function ClienteOrdensPage() {
     ]);
 
     if (ordensRes.data) setOrdens(ordensRes.data as unknown as Ordem[]);
-    if (scootersRes.data) setScooters(scootersRes.data);
+    if (scootersRes.data) setScooters(scootersRes.data as unknown as Scooter[]);
     setLoading(false);
   }
 
@@ -76,7 +76,7 @@ export default function ClienteOrdensPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { error } = await supabase.from("ordens_servico").insert({
+      const { error } = await (supabase.from("ordens_servico") as any).insert({
         scooter_id: form.scooter_id,
         cliente_id: user.id,
         status: "agendado",
@@ -111,7 +111,7 @@ export default function ClienteOrdensPage() {
             <form onSubmit={handleSolicitar} className="space-y-4">
               <div className="space-y-2">
                 <Label>Scooter</Label>
-                <Select value={form.scooter_id} onValueChange={v => setForm({...form, scooter_id: v})}>
+                <Select value={form.scooter_id} onValueChange={v => setForm({...form, scooter_id: v ?? ""})}>
                   <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
                     {scooters.map(s => <SelectItem key={s.id} value={s.id}>{s.modelo} - {s.chassi}</SelectItem>)}

@@ -126,7 +126,7 @@ export default function OrdensPage() {
         .order("created_at", { ascending: false });
 
       if (statusFilter !== "todos") {
-        query = query.eq("status", statusFilter);
+        query = query.eq("status", statusFilter as any);
       }
 
       if (dateFrom) {
@@ -217,8 +217,8 @@ export default function OrdensPage() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
 
-      const { data, error } = await supabase
-        .from("ordens_servico")
+      const { data, error } = await (supabase
+        .from("ordens_servico") as any)
         .insert({
           cliente_id: newOS.cliente_id,
           scooter_id: newOS.scooter_id,
@@ -232,7 +232,7 @@ export default function OrdensPage() {
       if (error) throw error;
 
       if (data) {
-        await supabase.from("timeline_eventos").insert({
+        await (supabase.from("timeline_eventos") as any).insert({
           ordem_id: data.id,
           responsavel_id: user?.id || null,
           tipo: "criacao",

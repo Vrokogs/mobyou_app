@@ -92,7 +92,7 @@ export default function ChassiPage() {
 
     const scooter = scooterData;
 
-    const promises: Promise<unknown>[] = [
+    const promises: PromiseLike<unknown>[] = [
       supabase
         .from("garantias")
         .select("*")

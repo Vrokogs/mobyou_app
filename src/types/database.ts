@@ -45,6 +45,10 @@ export type Profile = {
   role: Role;
   avatar_url: string | null;
   ativo: boolean;
+  cidade: string | null;
+  estado: string | null;
+  cep: string | null;
+  unidade: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -59,6 +63,8 @@ export type Scooter = {
   ano: number | null;
   numero_serie: string | null;
   chassi: string | null;
+  km_atual: number | null;
+  status: string | null;
   data_compra: string | null;
   created_at: string;
   updated_at: string;
@@ -68,6 +74,7 @@ export type Garantia = {
   id: string;
   scooter_id: string;
   cliente_id: string;
+  tipo: string | null;
   data_compra: string | null;
   data_inicio: string;
   data_fim: string;
@@ -83,6 +90,8 @@ export type OrdemServico = {
   cliente_id: string;
   tecnico_id: string | null;
   status: OrdemServicoStatus;
+  tipo: string | null;
+  valor_total: number | null;
   km_atual: number | null;
   foto_km: string | null;
   data_agendamento: string | null;
@@ -120,6 +129,10 @@ export type Diagnostico = {
   pecas_necessarias: string | null;
   servicos_necessarios: string | null;
   tempo_estimado: string | null;
+  descricao: string | null;
+  causa_raiz: string | null;
+  recomendacoes: string | null;
+  componentes_afetados: string[] | null;
   observacoes: string | null;
   created_at: string;
 };
@@ -134,6 +147,7 @@ export type Orcamento = {
   custos_adicionais: number | null;
   prazo_estimado: string | null;
   valor_total: number | null;
+  observacoes: string | null;
   status: string | null;
   aprovado_por: string | null;
   data_aprovacao: string | null;
@@ -182,6 +196,7 @@ export type EstoqueMovimentacao = {
 
 export type Contrato = {
   id: string;
+  numero: string | null;
   tipo: ContratoTipo;
   titulo: string;
   cliente_id: string;

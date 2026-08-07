@@ -65,7 +65,7 @@ export default function GarantiasPage() {
       .order("created_at", { ascending: false });
 
     if (statusFilter !== "all") {
-      query = query.eq("status", statusFilter);
+      query = query.eq("status", statusFilter as any);
     }
 
     const { data } = await query;
@@ -139,7 +139,7 @@ export default function GarantiasPage() {
 
       <div className="flex items-center gap-3">
         <Filter className="h-4 w-4 text-muted-foreground" />
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select value={statusFilter} onValueChange={(v) => v && setStatusFilter(v)}>
           <SelectTrigger className="w-48">
             <SelectValue placeholder="Filtrar por status" />
           </SelectTrigger>
@@ -228,7 +228,7 @@ export default function GarantiasPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <Select value={newStatus} onValueChange={setNewStatus}>
+            <Select value={newStatus} onValueChange={(v) => v && setNewStatus(v)}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Selecione o novo status" />
               </SelectTrigger>

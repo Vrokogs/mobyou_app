@@ -71,7 +71,7 @@ export default function VendedorContratosPage() {
       .order("created_at", { ascending: false });
 
     if (tipoFilter !== "todos") {
-      query = query.eq("tipo", tipoFilter);
+      query = query.eq("tipo", tipoFilter as any);
     }
 
     if (search.trim()) {
@@ -166,7 +166,7 @@ export default function VendedorContratosPage() {
 
       const titulo = newContrato.titulo || `${CONTRATO_TIPOS[newContrato.tipo as ContratoTipo]} - ${clientes.find((c) => c.id === newContrato.cliente_id)?.nome || ""}`;
 
-      const { error } = await supabase.from("contratos").insert({
+      const { error } = await (supabase.from("contratos") as any).insert({
         tipo: newContrato.tipo as ContratoTipo,
         titulo,
         conteudo,

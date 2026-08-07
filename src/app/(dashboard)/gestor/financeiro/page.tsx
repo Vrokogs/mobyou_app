@@ -22,16 +22,13 @@ const MONTHS = [
 
 interface VendaRow {
   id: string;
-  numero: string;
-  valor: number;
-  valor_final: number;
-  valor_desconto: number;
-  forma_pagamento: string;
+  valor_total: number | null;
+  forma_pagamento: string | null;
   parcelas: number | null;
-  data_venda: string;
-  status: string;
+  unidade: string | null;
+  modelo: string | null;
+  created_at: string;
   cliente?: { nome: string } | null;
-  scooter?: { modelo: string } | null;
   vendedor?: { nome: string } | null;
 }
 
@@ -60,10 +57,10 @@ export default function FinanceiroPage() {
 
     const { data: vendasData } = await supabase
       .from("vendas")
-      .select("*, cliente:profiles!vendas_cliente_id_fkey(nome), scooter:scooters!vendas_scooter_id_fkey(modelo), vendedor:profiles!vendas_vendedor_id_fkey(nome)")
-      .gte("data_venda", startDate)
-      .lte("data_venda", endDate)
-      .order("data_venda", { ascending: false });
+      .select("*, cliente:profiles!vendas_cliente_id_fkey(nome), vendedor:profiles!vendas_vendedor_id_fkey(nome)")
+      .gte("created_at", `${startDate}T00:00:00`)
+      .lte("created_at", `${endDate}T23:59:59`)
+      .order("created_at", { ascending: false });
 
     setVendas((vendasData ?? []) as unknown as VendaRow[]);
 
@@ -82,16 +79,16 @@ export default function FinanceiroPage() {
     const yearEnd = `${year}-12-31`;
 
     const [yearVendas, yearOrc] = await Promise.all([
-      supabase.from("vendas").select("valor_final, data_venda").gte("data_venda", yearStart).lte("data_venda", yearEnd),
+      supabase.from("vendas").select("valor_total, created_at").gte("created_at", `${yearStart}T00:00:00`).lte("created_at", `${yearEnd}T23:59:59`),
       supabase.from("orcamentos").select("valor_total, created_at").gte("created_at", `${yearStart}T00:00:00`).lte("created_at", `${yearEnd}T23:59:59`),
     ]);
 
     const monthTotals: Record<number, number> = {};
-    (yearVendas.data ?? []).forEach((v: { valor_final: number; data_venda: string }) => {
-      const m = new Date(v.data_venda).getMonth();
-      monthTotals[m] = (monthTotals[m] || 0) + (v.valor_final || 0);
+    (yearVendas.data ?? []).forEach((v: { valor_total: number | null; created_at: string }) => {
+      const m = new Date(v.created_at).getMonth();
+      monthTotals[m] = (monthTotals[m] || 0) + (v.valor_total || 0);
     });
-    (yearOrc.data ?? []).forEach((o: { valor_total: number; created_at: string }) => {
+    (yearOrc.data ?? []).forEach((o: { valor_total: number | null; created_at: string }) => {
       const m = new Date(o.created_at).getMonth();
       monthTotals[m] = (monthTotals[m] || 0) + (o.valor_total || 0);
     });
@@ -109,12 +106,12 @@ export default function FinanceiroPage() {
     loadFinanceiro();
   }, [loadFinanceiro]);
 
-  const receitaVendas = vendas.reduce((acc, v) => acc + (v.valor_final || 0), 0);
+  const receitaVendas = vendas.reduce((acc, v) => acc + (v.valor_total || 0), 0);
   const receitaMensal = receitaVendas + servicosReceita;
   const totalTransacoes = vendas.length;
   const ticketMedio = totalTransacoes > 0 ? receitaVendas / totalTransacoes : 0;
   const receitaAnual = monthlyData.reduce((acc, m) => acc + m.total, 0);
-  const descontosMensal = vendas.reduce((acc, v) => acc + (v.valor_desconto || 0), 0);
+  const descontosMensal = 0;
   const custos = receitaMensal * 0.6;
   const lucro = receitaMensal - custos;
 
@@ -298,52 +295,31 @@ export default function FinanceiroPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Numero</TableHead>
                   <TableHead>Cliente</TableHead>
-                  <TableHead>Scooter</TableHead>
+                  <TableHead>Modelo</TableHead>
+                  <TableHead>Unidade</TableHead>
                   <TableHead>Vendedor</TableHead>
                   <TableHead>Valor</TableHead>
-                  <TableHead>Desconto</TableHead>
-                  <TableHead>Final</TableHead>
                   <TableHead>Pagamento</TableHead>
                   <TableHead>Data</TableHead>
-                  <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {vendas.map((venda) => (
                   <TableRow key={venda.id}>
-                    <TableCell className="font-mono text-xs">{venda.numero}</TableCell>
                     <TableCell className="font-medium">{venda.cliente?.nome ?? "---"}</TableCell>
-                    <TableCell>{venda.scooter?.modelo ?? "---"}</TableCell>
+                    <TableCell>{venda.modelo ?? "---"}</TableCell>
+                    <TableCell className="text-sm">{venda.unidade ?? "---"}</TableCell>
                     <TableCell className="text-sm">{venda.vendedor?.nome ?? "---"}</TableCell>
-                    <TableCell>{formatCurrency(venda.valor)}</TableCell>
-                    <TableCell className="text-orange-600">
-                      {venda.valor_desconto > 0 ? `-${formatCurrency(venda.valor_desconto)}` : "---"}
-                    </TableCell>
                     <TableCell className="font-bold text-green-700">
-                      {formatCurrency(venda.valor_final)}
+                      {formatCurrency(venda.valor_total || 0)}
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary" className="text-xs capitalize">
                         {venda.forma_pagamento?.replace("_", " ") ?? "---"}
                       </Badge>
                     </TableCell>
-                    <TableCell>{formatDate(venda.data_venda)}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="secondary"
-                        className={
-                          venda.status === "concluida"
-                            ? "bg-green-100 text-green-800"
-                            : venda.status === "cancelada"
-                            ? "bg-red-100 text-red-800"
-                            : "bg-yellow-100 text-yellow-800"
-                        }
-                      >
-                        {venda.status}
-                      </Badge>
-                    </TableCell>
+                    <TableCell>{formatDate(venda.created_at)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

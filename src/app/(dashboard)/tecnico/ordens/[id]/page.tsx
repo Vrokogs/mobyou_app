@@ -191,7 +191,7 @@ export default function TecnicoOrdemDetailPage() {
       return;
     }
     setOrdem(data as unknown as OrdemDetail);
-    setKmValue(data.km_atual?.toString() ?? "");
+    setKmValue((data as any).km_atual?.toString() ?? "");
   }, [orderId, supabase]);
 
   const loadCheckin = useCallback(async () => {
@@ -326,12 +326,12 @@ export default function TecnicoOrdemDetailPage() {
       if (error) throw error;
 
       const { data: { publicUrl } } = supabase.storage.from("fotos-ordem").getPublicUrl(path);
-      const { error: insertError } = await supabase.from("fotos_ordem").insert({
+      const { error: insertError } = await (supabase.from("fotos_ordem") as any).insert({
         ordem_id: orderId,
         tipo,
         url: publicUrl,
         storage_path: path,
-      } as Record<string, unknown>);
+      });
 
       if (insertError) throw insertError;
 
@@ -471,12 +471,12 @@ export default function TecnicoOrdemDetailPage() {
           .eq("id", diagnostico.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("diagnosticos").insert(diagPayload);
+        const { error } = await (supabase.from("diagnosticos") as any).insert(diagPayload);
         if (error) throw error;
       }
 
       // Add timeline event for diagnosis
-      await supabase.from("timeline_eventos").insert({
+      await (supabase.from("timeline_eventos") as any).insert({
         ordem_id: orderId,
         responsavel_id: user.id,
         tipo: "diagnostico",
@@ -519,16 +519,16 @@ export default function TecnicoOrdemDetailPage() {
           const { data: { publicUrl } } = supabase.storage.from("fotos-ordem").getPublicUrl(path);
           fotoUrl = publicUrl;
 
-          await supabase.from("fotos_ordem").insert({
+          await (supabase.from("fotos_ordem") as any).insert({
             ordem_id: orderId,
             tipo: "servico",
             url: publicUrl,
             storage_path: path,
-          } as Record<string, unknown>);
+          });
         }
       }
 
-      await supabase.from("timeline_eventos").insert({
+      await (supabase.from("timeline_eventos") as any).insert({
         ordem_id: orderId,
         responsavel_id: user.id,
         tipo: "progresso",
@@ -582,8 +582,8 @@ export default function TecnicoOrdemDetailPage() {
         updatePayload.data_finalizacao = new Date().toISOString();
       }
 
-      const { error } = await supabase
-        .from("ordens_servico")
+      const { error } = await (supabase
+        .from("ordens_servico") as any)
         .update(updatePayload)
         .eq("id", orderId);
 
@@ -591,7 +591,7 @@ export default function TecnicoOrdemDetailPage() {
 
       // Add timeline event
       if (user) {
-        await supabase.from("timeline_eventos").insert({
+        await (supabase.from("timeline_eventos") as any).insert({
           ordem_id: orderId,
           responsavel_id: user.id,
           tipo: "status_change",

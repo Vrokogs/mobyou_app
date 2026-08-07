@@ -127,7 +127,7 @@ export default function ScootersPage() {
     setSaving(true);
     const supabase = createClient();
 
-    await supabase.from("scooters").insert({
+    await (supabase.from("scooters") as any).insert({
       modelo: formData.modelo,
       marca: formData.marca,
       cor: formData.cor || null,

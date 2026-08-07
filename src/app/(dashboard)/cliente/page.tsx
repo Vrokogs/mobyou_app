@@ -84,7 +84,7 @@ export default function ClienteDashboardPage() {
             return { ...s, garantia };
           })
         );
-        setScooters(scootersWithGarantia);
+        setScooters(scootersWithGarantia as unknown as ScooterData[]);
       }
 
       if (ordensRes.data) setOrdensAtivas(ordensRes.data as unknown as OrdemAtiva[]);

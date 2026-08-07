@@ -107,7 +107,7 @@ export default function UsuariosPage() {
 
     if (authError) {
       // If admin API fails (expected without service role), create profile directly
-      const { error: profileError } = await supabase.from("profiles").insert({
+      const { error: profileError } = await (supabase.from("profiles") as any).insert({
         id: crypto.randomUUID(),
         email: formData.email,
         nome: formData.nome,
@@ -128,7 +128,7 @@ export default function UsuariosPage() {
         return;
       }
     } else if (authData.user) {
-      await supabase.from("profiles").upsert({
+      await (supabase.from("profiles") as any).upsert({
         id: authData.user.id,
         email: formData.email,
         nome: formData.nome,

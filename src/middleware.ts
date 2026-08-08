@@ -87,9 +87,16 @@ export async function middleware(request: NextRequest) {
 
   for (const { prefix, role } of PROTECTED_PREFIXES) {
     if (pathname.startsWith(prefix) && userRole !== role) {
-      // Exceção: vendedor habilitado à manutenção pode acessar as OS do técnico.
-      if (prefix === '/tecnico' && userRole === 'vendedor' && podeManutencao(user.email)) {
-        continue;
+      // Exceção: vendedor habilitado à manutenção acessa toda a área de OS —
+      // as ordens do técnico e as ordens/orçamentos do gestor.
+      if (userRole === 'vendedor' && podeManutencao(user.email)) {
+        if (prefix === '/tecnico') continue;
+        if (
+          prefix === '/gestor' &&
+          (pathname.startsWith('/gestor/ordens') || pathname.startsWith('/gestor/orcamentos'))
+        ) {
+          continue;
+        }
       }
       const url = request.nextUrl.clone();
       url.pathname = getDashboardPath(userRole);

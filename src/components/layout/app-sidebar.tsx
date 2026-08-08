@@ -143,10 +143,13 @@ const navByRole: Record<string, NavGroup[]> = {
 };
 
 // Grupo de OS liberado a vendedores que também fazem manutenção.
+// Dá acesso à área completa de OS (mesmas telas do gestor) + fila do técnico.
 const oficinaGroup: NavGroup = {
   label: "Oficina",
   items: [
-    { title: "Ordens de Serviço", href: "/tecnico/ordens", icon: Wrench },
+    { title: "Ordens de Serviço", href: "/gestor/ordens", icon: ClipboardList },
+    { title: "Orçamentos", href: "/gestor/orcamentos", icon: DollarSign },
+    { title: "Minhas OS", href: "/tecnico/ordens", icon: Wrench },
   ],
 };
 

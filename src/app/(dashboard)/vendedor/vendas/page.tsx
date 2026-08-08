@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { Plus, Search, DollarSign, Loader2 } from "lucide-react";
+import { Plus, Search, DollarSign, Loader2, Trash2 } from "lucide-react";
 import { UNIDADES_VENDA, MOBYOU_MODELOS, ORIGEM_VENDA } from "@/lib/constants";
 
 interface Venda {
@@ -73,6 +73,23 @@ export default function VendedorVendasPage() {
     if (vendasRes.data) setVendas(vendasRes.data as unknown as Venda[]);
     if (clientesRes.data) setClientes(clientesRes.data as unknown as Cliente[]);
     setLoading(false);
+  }
+
+  async function deletarVenda(id: string) {
+    if (!confirm("Apagar esta venda? Se a moto estiver vinculada no estoque, ela volta a Disponível.")) return;
+    try {
+      const supabase = createClient();
+      await (supabase.from("estoque_motos") as any)
+        .update({ estado: "Disponível", venda_id: null, vendedor_id: null })
+        .eq("venda_id", id);
+      const { data: del, error } = await supabase.from("vendas").delete().eq("id", id).select("id");
+      if (error) throw error;
+      if (!del || del.length === 0) throw new Error("Sem permissão (rode a migration 021).");
+      toast.success("Venda apagada.");
+      loadData();
+    } catch (e) {
+      toast.error("Erro ao apagar venda", { description: e instanceof Error ? e.message : "" });
+    }
   }
 
   async function handleVenda(e: React.FormEvent) {
@@ -237,12 +254,13 @@ export default function VendedorVendasPage() {
                   <TableHead>Valor</TableHead>
                   <TableHead>Parcelas</TableHead>
                   <TableHead>Pagamento</TableHead>
+                  <TableHead className="w-10"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">Nenhuma venda registrada</TableCell>
+                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">Nenhuma venda registrada</TableCell>
                   </TableRow>
                 ) : filtered.map((venda) => (
                   <TableRow key={venda.id}>
@@ -258,6 +276,12 @@ export default function VendedorVendasPage() {
                     </TableCell>
                     <TableCell>{venda.parcelas ?? 1}x</TableCell>
                     <TableCell>{FORMA_LABEL[venda.forma_pagamento] ?? venda.forma_pagamento}</TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"
+                        onClick={() => deletarVenda(venda.id)} title="Apagar venda">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

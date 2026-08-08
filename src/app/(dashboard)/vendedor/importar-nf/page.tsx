@@ -49,6 +49,7 @@ interface VendaData {
   numero_nf: string;
   forma_pagamento: string;
   unidade: string;
+  vendedor_id: string;
 }
 
 interface ExtractedData {
@@ -64,7 +65,7 @@ const EMPTY_SCOOTER: ScooterData = {
 const EMPTY_DATA: ExtractedData = {
   cliente: { nome: "", cpf: "", telefone: "", email: "", endereco: "", senha: "" },
   scooters: [{ ...EMPTY_SCOOTER }],
-  venda: { valor: "", parcelas: "1", data_compra: new Date().toISOString().slice(0, 10), numero_nf: "", forma_pagamento: "pix", unidade: "" },
+  venda: { valor: "", parcelas: "1", data_compra: new Date().toISOString().slice(0, 10), numero_nf: "", forma_pagamento: "pix", unidade: "", vendedor_id: "" },
 };
 
 function cloneEmpty(): ExtractedData {
@@ -142,6 +143,34 @@ export default function VendedorImportarNFPage() {
   const [imported, setImported] = useState(false);
   const [historico, setHistorico] = useState<(NotaFiscal & { cliente?: { nome: string } | null })[]>([]);
   const [loading, setLoading] = useState(true);
+  const [vendedores, setVendedores] = useState<{ id: string; nome: string; unidade: string | null }[]>([]);
+  const [meuDefault, setMeuDefault] = useState<{ id: string; unidade: string }>({ id: "", unidade: "" });
+
+  // Carrega os vendedores e guarda o usuário logado + sua unidade como default
+  useEffect(() => {
+    (async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data } = await supabase
+        .from("profiles").select("id, nome, unidade")
+        .in("role", ["vendedor", "gestor"]).eq("ativo", true).order("nome");
+      const lista = (data ?? []) as { id: string; nome: string; unidade: string | null }[];
+      setVendedores(lista);
+      const eu = lista.find((v) => v.id === user?.id);
+      if (eu) setMeuDefault({ id: eu.id, unidade: eu.unidade ?? "" });
+    })();
+  }, []);
+
+  // Ao extrair a NF, pré-preenche vendedor + unidade com o vendedor logado
+  useEffect(() => {
+    if (!extractedData || !meuDefault.id) return;
+    setExtractedData((prev) => {
+      if (!prev) return prev;
+      if (prev.venda.vendedor_id) return prev;
+      return { ...prev, venda: { ...prev.venda, vendedor_id: meuDefault.id, unidade: prev.venda.unidade || meuDefault.unidade } };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extractedData?.venda.numero_nf, meuDefault.id]);
 
   const loadHistorico = useCallback(async () => {
     const supabase = createClient();
@@ -405,8 +434,9 @@ export default function VendedorImportarNFPage() {
         const contratoId = (contratoData as any)?.id ?? null;
 
         const itemValor = scooter.valor ? parseFloat(scooter.valor) : 0;
+        const vendedorFinal = venda.vendedor_id || user.id;
         const { data: vendaRow } = await (supabase.from("vendas") as any).insert({
-          vendedor_id: user.id,
+          vendedor_id: vendedorFinal,
           cliente_id: clienteId,
           scooter_id: scooterId,
           nota_fiscal_id: notaFiscalId,
@@ -423,7 +453,7 @@ export default function VendedorImportarNFPage() {
         // Conferência por chassi: casa a moto no estoque e vira Disponível -> Vendido
         if (scooter.chassi) {
           await (supabase.from("estoque_motos") as any)
-            .update({ estado: "Vendido", vendedor_id: user.id, venda_id: vendaRow?.id ?? null })
+            .update({ estado: "Vendido", vendedor_id: vendedorFinal, venda_id: vendaRow?.id ?? null })
             .eq("chassi", scooter.chassi)
             .neq("estado", "Vendido");
         }
@@ -625,6 +655,19 @@ export default function VendedorImportarNFPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Vendedor (quem realizou a venda)</Label>
+                  <Select
+                    items={Object.fromEntries(vendedores.map((v) => [v.id, v.nome]))}
+                    value={extractedData.venda.vendedor_id}
+                    onValueChange={(v) => updateVenda("vendedor_id", (v as string) ?? "")}
+                  >
+                    <SelectTrigger className="w-full"><SelectValue placeholder="Selecione o vendedor" /></SelectTrigger>
+                    <SelectContent>
+                      {vendedores.map((v) => <SelectItem key={v.id} value={v.id}>{v.nome}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="rounded-md bg-muted/50 px-3 py-2 text-sm flex items-center justify-between">
                   <span className="text-muted-foreground">Soma dos itens</span>

@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { DollarSign, MapPin, TrendingUp, Store, Users, Bike, CalendarRange } from "lucide-react";
+import { DollarSign, MapPin, TrendingUp, Store, Users, Bike, CalendarRange, Trash2 } from "lucide-react";
 import { UNIDADES_VENDA } from "@/lib/constants";
+import { toast } from "sonner";
 
 interface Venda {
   id: string;
@@ -29,19 +31,40 @@ const brl = (n: number) => "R$ " + n.toLocaleString("pt-BR", { minimumFractionDi
 export default function GestorVendasPage() {
   const [vendas, setVendas] = useState<Venda[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletando, setDeletando] = useState<string>("");
 
-  useEffect(() => {
-    async function load() {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("vendas")
-        .select("*, cliente:profiles!cliente_id(nome), vendedor:profiles!vendedor_id(nome)")
-        .order("created_at", { ascending: false });
-      setVendas((data ?? []) as unknown as Venda[]);
-      setLoading(false);
-    }
-    load();
+  const load = useCallback(async () => {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("vendas")
+      .select("*, cliente:profiles!cliente_id(nome), vendedor:profiles!vendedor_id(nome)")
+      .order("created_at", { ascending: false });
+    setVendas((data ?? []) as unknown as Venda[]);
+    setLoading(false);
   }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function deletarVenda(id: string) {
+    if (!confirm("Apagar esta venda? Se a moto estiver vinculada no estoque, ela volta a Disponível.")) return;
+    setDeletando(id);
+    try {
+      const supabase = createClient();
+      // Reverte a moto do estoque (se vinculada a esta venda)
+      await (supabase.from("estoque_motos") as any)
+        .update({ estado: "Disponível", venda_id: null, vendedor_id: null })
+        .eq("venda_id", id);
+      const { data: del, error } = await supabase.from("vendas").delete().eq("id", id).select("id");
+      if (error) throw error;
+      if (!del || del.length === 0) throw new Error("Sem permissão (rode a migration 021).");
+      toast.success("Venda apagada.");
+      load();
+    } catch (e) {
+      toast.error("Erro ao apagar venda", { description: e instanceof Error ? e.message : "" });
+    } finally {
+      setDeletando("");
+    }
+  }
 
   const now = new Date();
   const doMes = (v: Venda) => {
@@ -226,6 +249,7 @@ export default function GestorVendasPage() {
                     <TableHead>Vendedor</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Valor</TableHead>
+                    <TableHead className="w-10"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -236,6 +260,12 @@ export default function GestorVendasPage() {
                       <TableCell>{v.vendedor?.nome ?? "---"}</TableCell>
                       <TableCell>{v.cliente?.nome ?? "---"}</TableCell>
                       <TableCell>{brl(v.valor_total ?? 0)}</TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"
+                          disabled={deletando === v.id} onClick={() => deletarVenda(v.id)} title="Apagar venda">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

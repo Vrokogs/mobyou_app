@@ -1,14 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { createClient } from "@/lib/supabase/client";
-import { Search, Wrench } from "lucide-react";
+import { toast } from "sonner";
+import { Search, Wrench, Plus, Loader2 } from "lucide-react";
 
 interface Ordem {
   id: string;
@@ -35,29 +40,81 @@ const STATUS_COLORS: Record<string, string> = {
   entregue: "bg-green-100 text-green-800",
 };
 
+interface ClienteOpt { id: string; nome: string }
+interface ScooterOpt { id: string; modelo: string; chassi: string | null; cliente_id: string | null }
+
+const EMPTY_OS = { cliente_id: "", scooter_id: "", data_agendamento: "", observacoes: "" };
+
 export default function TecnicoOrdensPage() {
   const [ordens, setOrdens] = useState<Ordem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("todas");
+  const [userId, setUserId] = useState("");
+  const [clientes, setClientes] = useState<ClienteOpt[]>([]);
+  const [scooters, setScooters] = useState<ScooterOpt[]>([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ ...EMPTY_OS });
 
-  useEffect(() => {
-    async function load() {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+  const load = useCallback(async () => {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    setUserId(user.id);
 
-      const { data } = await supabase
+    const [ordensRes, clientesRes, scootersRes] = await Promise.all([
+      supabase
         .from("ordens_servico")
         .select("id, numero, status, km_atual, created_at, cliente:profiles!cliente_id(nome), scooter:scooters!scooter_id(modelo, chassi)")
         .eq("tecnico_id", user.id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false }),
+      supabase.from("profiles").select("id, nome").eq("role", "cliente").order("nome"),
+      supabase.from("scooters").select("id, modelo, chassi, cliente_id"),
+    ]);
 
-      if (data) setOrdens(data as unknown as Ordem[]);
-      setLoading(false);
-    }
-    load();
+    if (ordensRes.data) setOrdens(ordensRes.data as unknown as Ordem[]);
+    setClientes((clientesRes.data ?? []) as unknown as ClienteOpt[]);
+    setScooters((scootersRes.data ?? []) as unknown as ScooterOpt[]);
+    setLoading(false);
   }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function criarOS() {
+    if (!form.cliente_id) { toast.error("Selecione o cliente."); return; }
+    if (!form.scooter_id) { toast.error("Selecione a scooter."); return; }
+    setSaving(true);
+    try {
+      const supabase = createClient();
+      const { error } = await (supabase.from("ordens_servico") as any).insert({
+        cliente_id: form.cliente_id,
+        scooter_id: form.scooter_id,
+        tecnico_id: userId,
+        status: "recebido",
+        data_agendamento: form.data_agendamento ? new Date(form.data_agendamento).toISOString() : null,
+        observacoes: form.observacoes || null,
+      });
+      if (error) throw error;
+      toast.success("Ordem de serviço criada!");
+      setDialogOpen(false);
+      setForm({ ...EMPTY_OS });
+      load();
+    } catch (e) {
+      toast.error("Erro ao criar OS", { description: e instanceof Error ? e.message : "" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Scooters do cliente selecionado (ou todas se nenhum cliente escolhido)
+  const scootersDoCliente = form.cliente_id
+    ? scooters.filter((s) => s.cliente_id === form.cliente_id)
+    : scooters;
+  const clienteItems = Object.fromEntries(clientes.map((c) => [c.id, c.nome]));
+  const scooterItems = Object.fromEntries(
+    scootersDoCliente.map((s) => [s.id, `${s.modelo}${s.chassi ? ` - ${s.chassi}` : ""}`])
+  );
 
   const filtered = ordens.filter(o => {
     const matchSearch = o.cliente?.nome?.toLowerCase().includes(search.toLowerCase()) ||
@@ -69,9 +126,59 @@ export default function TecnicoOrdensPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Minhas Ordens de Serviço</h1>
-        <p className="text-muted-foreground">Gerencie os serviços atribuídos a você</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Minhas Ordens de Serviço</h1>
+          <p className="text-muted-foreground">Gerencie os serviços atribuídos a você</p>
+        </div>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger render={<Button><Plus className="h-4 w-4 mr-1.5" /> Nova OS</Button>} />
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader><DialogTitle>Nova Ordem de Serviço</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Cliente</Label>
+                <Select items={clienteItems} value={form.cliente_id}
+                  onValueChange={(v) => v && setForm((f) => ({ ...f, cliente_id: v, scooter_id: "" }))}>
+                  <SelectTrigger className="w-full"><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
+                  <SelectContent>
+                    {clientes.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Scooter</Label>
+                <Select items={scooterItems} value={form.scooter_id}
+                  onValueChange={(v) => v && setForm((f) => ({ ...f, scooter_id: v }))}>
+                  <SelectTrigger className="w-full"><SelectValue placeholder="Selecione a scooter" /></SelectTrigger>
+                  <SelectContent>
+                    {scootersDoCliente.length === 0 ? (
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">Nenhuma scooter para este cliente</div>
+                    ) : scootersDoCliente.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>{s.modelo}{s.chassi ? ` - ${s.chassi}` : ""}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Data/hora (opcional)</Label>
+                <Input type="datetime-local" value={form.data_agendamento}
+                  onChange={(e) => setForm((f) => ({ ...f, data_agendamento: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Observações</Label>
+                <Textarea rows={2} placeholder="Motivo do serviço, sintomas relatados..."
+                  value={form.observacoes} onChange={(e) => setForm((f) => ({ ...f, observacoes: e.target.value }))} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button onClick={criarOS} disabled={saving}>
+                {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+                Criar OS
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="flex gap-4">

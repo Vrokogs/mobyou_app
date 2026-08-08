@@ -348,11 +348,19 @@ export default function TecnicoOrdemDetailPage() {
 
   async function deleteFoto(foto: FotoOrdem) {
     try {
-      await supabase.from("fotos_ordem").delete().eq("id", foto.id);
+      const { data: del, error } = await supabase
+        .from("fotos_ordem").delete().eq("id", foto.id).select("id");
+      if (error) throw error;
+      if (!del || del.length === 0) {
+        throw new Error("Sem permissão para remover (rode a migration de policies).");
+      }
+      if (foto.storage_path) {
+        await supabase.storage.from("fotos").remove([foto.storage_path]);
+      }
       toast.success("Foto removida");
       await loadFotos();
-    } catch {
-      toast.error("Erro ao remover foto");
+    } catch (e) {
+      toast.error("Erro ao remover foto", { description: e instanceof Error ? e.message : "" });
     }
   }
 

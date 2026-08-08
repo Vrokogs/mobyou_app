@@ -32,6 +32,7 @@ interface MotoEstoque {
   quantidade: number;
   quantidade_montar: number;
   estado: string;
+  venda_id: string | null;
   observacoes: string | null;
 }
 
@@ -46,6 +47,7 @@ const EMPTY_FORM = {
   estado: "Disponível",
   vendedor_id: "",
   valor_venda: "",
+  venda_id: "",
 };
 
 const ESTADO_COR: Record<string, string> = {
@@ -96,7 +98,19 @@ export function EstoqueMotos() {
     setDialogOpen(true);
   }
 
-  function openEditar(m: MotoEstoque) {
+  async function openEditar(m: MotoEstoque) {
+    let vendedorId = "";
+    let valorVenda = "";
+    // Se já tem venda vinculada, carrega vendedor e valor para exibir/ajustar
+    if (m.venda_id) {
+      const supabase = createClient();
+      const { data: v } = await (supabase as any).from("vendas")
+        .select("vendedor_id, valor_total").eq("id", m.venda_id).maybeSingle();
+      if (v) {
+        vendedorId = v.vendedor_id ?? "";
+        valorVenda = v.valor_total != null ? String(v.valor_total) : "";
+      }
+    }
     setForm({
       ...EMPTY_FORM,
       id: m.id,
@@ -107,6 +121,9 @@ export function EstoqueMotos() {
       quantidade: String(m.quantidade),
       quantidade_montar: String(m.quantidade_montar),
       estado: m.estado,
+      venda_id: m.venda_id ?? "",
+      vendedor_id: vendedorId,
+      valor_venda: valorVenda,
     });
     setEstadoOriginal(m.estado);
     setDialogOpen(true);
@@ -116,8 +133,10 @@ export function EstoqueMotos() {
     if (!form.modelo) { toast.error("Selecione o modelo da moto."); return; }
     if (!form.unidade) { toast.error("Selecione a unidade."); return; }
 
-    const virouVendido = form.estado === "Vendido" && estadoOriginal !== "Vendido";
-    if (virouVendido && !form.vendedor_id) {
+    const estadoVendido = form.estado === "Vendido";
+    // Precisa registrar a venda quando está Vendido e ainda não foi contabilizada
+    const precisaRegistrar = estadoVendido && !form.venda_id;
+    if (precisaRegistrar && !form.vendedor_id) {
       toast.error("Selecione o vendedor que realizou a venda.");
       return;
     }
@@ -137,41 +156,55 @@ export function EstoqueMotos() {
         quantidade_montar: parseInt(form.quantidade_montar) || 0,
         estado: form.estado,
       };
-      if (virouVendido) {
+      if (estadoVendido && form.vendedor_id) {
+        payload.vendedor_id = form.vendedor_id;
         payload.observacoes = `Vendido por ${vendedorNome} em ${new Date().toLocaleDateString("pt-BR")}`;
       }
 
+      // 1) Grava a moto e obtém o id
+      let motoId = form.id;
       if (form.id) {
         const { error } = await (supabase as any).from("estoque_motos")
           .update(payload).eq("id", form.id);
         if (error) throw error;
       } else {
-        const { error } = await (supabase as any).from("estoque_motos").insert(payload);
+        const { data: novo, error } = await (supabase as any).from("estoque_motos")
+          .insert(payload).select("id").single();
         if (error) throw error;
+        motoId = (novo as { id: string }).id;
       }
 
-      // Ao marcar como vendida, registra a venda (vendedor + loja + modelo)
-      if (virouVendido) {
-        const { error: vErr } = await (supabase as any).from("vendas").insert({
+      // 2) Contabiliza / atualiza a venda vinculada (vendedor + unidade + modelo + chassi)
+      if (estadoVendido && form.vendedor_id) {
+        const vendaPayload = {
           vendedor_id: form.vendedor_id,
           unidade: form.unidade,
           modelo: form.modelo,
+          chassi: form.chassi || null,
           valor_total: parseFloat(form.valor_venda) || 0,
           entrada: 0,
           parcelas: 1,
           forma_pagamento: "pix",
-        });
-        if (vErr) {
-          toast.warning("Estoque salvo, mas a venda não foi registrada.", {
-            description: vErr.message,
-          });
+        };
+        if (form.venda_id) {
+          // Já contabilizada: apenas ajusta os dados da venda existente
+          const { error: uErr } = await (supabase as any).from("vendas")
+            .update(vendaPayload).eq("id", form.venda_id);
+          if (uErr) throw uErr;
+          toast.success("Venda atualizada.");
         } else {
-          toast.success(`Vendida! Registrada para ${vendedorNome} (${form.unidade}).`);
-          setDialogOpen(false);
-          load();
-          setSaving(false);
-          return;
+          const { data: v, error: vErr } = await (supabase as any).from("vendas")
+            .insert(vendaPayload).select("id").single();
+          if (vErr) throw vErr;
+          // Vincula a venda à moto (evita duplicar na próxima edição)
+          await (supabase as any).from("estoque_motos")
+            .update({ venda_id: (v as { id: string }).id }).eq("id", motoId);
+          toast.success(`Vendida! Contabilizada para ${vendedorNome} (${form.unidade}).`);
         }
+        setDialogOpen(false);
+        load();
+        setSaving(false);
+        return;
       }
 
       toast.success("Estoque atualizado!");
@@ -296,8 +329,13 @@ export function EstoqueMotos() {
                     <Input type="number" step="0.01" placeholder="0,00" value={form.valor_venda}
                       onChange={(e) => setForm((f) => ({ ...f, valor_venda: e.target.value }))} />
                   </div>
-                  {estadoOriginal === "Vendido" && (
-                    <p className="text-[11px] text-muted-foreground">Já estava marcada como vendida — não cria nova venda.</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {form.venda_id
+                      ? "Venda já contabilizada — salvar apenas ajusta o vendedor/valor."
+                      : "Ao salvar, a venda é contabilizada para o vendedor e a unidade (aparece no ranking e no financeiro)."}
+                  </p>
+                  {estadoOriginal !== "Vendido" && (
+                    <p className="text-[11px] text-muted-foreground">Chassi: {form.chassi || "(sem chassi)"} — a moto sai do estoque como vendida.</p>
                   )}
                 </div>
               )}

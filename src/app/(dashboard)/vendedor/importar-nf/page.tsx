@@ -405,7 +405,7 @@ export default function VendedorImportarNFPage() {
         const contratoId = (contratoData as any)?.id ?? null;
 
         const itemValor = scooter.valor ? parseFloat(scooter.valor) : 0;
-        await (supabase.from("vendas") as any).insert({
+        const { data: vendaRow } = await (supabase.from("vendas") as any).insert({
           vendedor_id: user.id,
           cliente_id: clienteId,
           scooter_id: scooterId,
@@ -416,8 +416,17 @@ export default function VendedorImportarNFPage() {
           forma_pagamento: venda.forma_pagamento || "pix",
           unidade: venda.unidade || null,
           modelo: scooter.modelo || null,
+          chassi: scooter.chassi || null,
           contrato_id: contratoId,
-        });
+        }).select("id").single();
+
+        // Conferência por chassi: casa a moto no estoque e vira Disponível -> Vendido
+        if (scooter.chassi) {
+          await (supabase.from("estoque_motos") as any)
+            .update({ estado: "Vendido", vendedor_id: user.id, venda_id: vendaRow?.id ?? null })
+            .eq("chassi", scooter.chassi)
+            .neq("estado", "Vendido");
+        }
       }
 
       toast.success("Importacao concluida!", {

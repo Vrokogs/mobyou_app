@@ -322,10 +322,10 @@ export default function TecnicoOrdemDetailPage() {
     setUploadingFoto(tipo);
     try {
       const path = `ordens/${orderId}/${tipo}_${Date.now()}.${file.name.split(".").pop()}`;
-      const { error } = await supabase.storage.from("fotos-ordem").upload(path, file);
+      const { error } = await supabase.storage.from("fotos").upload(path, file);
       if (error) throw error;
 
-      const { data: { publicUrl } } = supabase.storage.from("fotos-ordem").getPublicUrl(path);
+      const { data: { publicUrl } } = supabase.storage.from("fotos").getPublicUrl(path);
       const { error: insertError } = await (supabase.from("fotos_ordem") as any).insert({
         ordem_id: orderId,
         tipo,
@@ -514,9 +514,9 @@ export default function TecnicoOrdemDetailPage() {
       // Upload optional event photo
       if (eventPhoto) {
         const path = `ordens/${orderId}/progresso_${Date.now()}.${eventPhoto.name.split(".").pop()}`;
-        const { error: uploadError } = await supabase.storage.from("fotos-ordem").upload(path, eventPhoto);
+        const { error: uploadError } = await supabase.storage.from("fotos").upload(path, eventPhoto);
         if (!uploadError) {
-          const { data: { publicUrl } } = supabase.storage.from("fotos-ordem").getPublicUrl(path);
+          const { data: { publicUrl } } = supabase.storage.from("fotos").getPublicUrl(path);
           fotoUrl = publicUrl;
 
           await (supabase.from("fotos_ordem") as any).insert({

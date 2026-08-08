@@ -287,6 +287,7 @@ export type Venda = {
   modelo: string | null;
   origem: string | null;
   lead_id: string | null;
+  chassi: string | null;
   created_at: string;
 };
 
@@ -300,6 +301,7 @@ export type EstoqueMoto = {
   quantidade_montar: number;
   estado: string;
   vendedor_id: string | null;
+  venda_id: string | null;
   observacoes: string | null;
   created_at: string;
   updated_at: string;

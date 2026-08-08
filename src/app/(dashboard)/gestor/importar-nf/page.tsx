@@ -387,7 +387,7 @@ export default function ImportarNFPage() {
         const itemValor = scooter.valor
           ? parseFloat(scooter.valor)
           : (validScooters.length === 1 && venda.valor ? parseFloat(venda.valor) : 0);
-        await (supabase.from("vendas") as any).insert({
+        const { data: vendaRow } = await (supabase.from("vendas") as any).insert({
           vendedor_id: venda.vendedor_id,
           cliente_id: clienteId,
           scooter_id: scooterId,
@@ -397,7 +397,16 @@ export default function ImportarNFPage() {
           forma_pagamento: venda.forma_pagamento || "pix",
           unidade: venda.unidade || null,
           modelo: scooter.modelo || null,
-        });
+          chassi: scooter.chassi || null,
+        }).select("id").single();
+
+        // Conferência por chassi: casa a moto no estoque e vira Disponível -> Vendido
+        if (scooter.chassi) {
+          await (supabase.from("estoque_motos") as any)
+            .update({ estado: "Vendido", vendedor_id: venda.vendedor_id, venda_id: vendaRow?.id ?? null })
+            .eq("chassi", scooter.chassi)
+            .neq("estado", "Vendido");
+        }
       }
 
       // 3. Gera os 3 documentos (Contrato de Compra e Venda + 2 Termos) a partir

@@ -47,7 +47,7 @@ interface OrdemDetail {
   created_at: string;
   scooter_id: string;
   cliente: { nome: string; telefone: string | null; email: string } | null;
-  scooter: { modelo: string; marca: string; chassi: string | null; placa: string | null; km_atual: number } | null;
+  scooter: { modelo: string; marca: string; chassi: string | null; km_atual: number } | null;
 }
 
 interface CheckinItemData {
@@ -181,7 +181,7 @@ export default function TecnicoOrdemDetailPage() {
       .select(
         "id, numero, status, km_atual, observacoes, created_at, scooter_id, " +
         "cliente:profiles!cliente_id(nome, telefone, email), " +
-        "scooter:scooters!scooter_id(modelo, marca, chassi, placa, km_atual)"
+        "scooter:scooters!scooter_id(modelo, marca, chassi, km_atual)"
       )
       .eq("id", orderId)
       .single();

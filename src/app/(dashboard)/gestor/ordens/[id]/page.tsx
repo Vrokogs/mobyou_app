@@ -549,7 +549,7 @@ export default function OrdemDetalhePage() {
           ordem_id: orderId,
           tipo,
           url: publicUrl,
-          descricao: null,
+          storage_path: filePath,
         });
 
       if (insertError) throw insertError;

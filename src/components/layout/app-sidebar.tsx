@@ -22,6 +22,7 @@ import {
   LogOut, ChevronUp, UserCog, Hash, ShoppingCart,
   Clock, Trophy, Radar,
 } from "lucide-react";
+import { podeManutencao } from "@/lib/constants";
 
 interface NavItem {
   title: string;
@@ -82,6 +83,7 @@ const vendedorNav: NavGroup[] = [
       { title: "Clientes", href: "/vendedor/clientes", icon: Users },
       { title: "Leads", href: "/vendedor/leads", icon: Radar },
       { title: "Vendas", href: "/vendedor/vendas", icon: ShoppingCart },
+      { title: "Ranking", href: "/vendedor/ranking", icon: Trophy },
     ],
   },
   {
@@ -140,6 +142,14 @@ const navByRole: Record<string, NavGroup[]> = {
   cliente: clienteNav,
 };
 
+// Grupo de OS liberado a vendedores que também fazem manutenção.
+const oficinaGroup: NavGroup = {
+  label: "Oficina",
+  items: [
+    { title: "Ordens de Serviço", href: "/tecnico/ordens", icon: Wrench },
+  ],
+};
+
 interface AppSidebarProps {
   userRole: string;
   userName: string;
@@ -149,7 +159,11 @@ interface AppSidebarProps {
 
 export function AppSidebar({ userRole, userName, userEmail, onLogout }: AppSidebarProps) {
   const pathname = usePathname();
-  const navigation = navByRole[userRole] || [];
+  let navigation = navByRole[userRole] || [];
+  // Vendedor habilitado à manutenção ganha o grupo de OS.
+  if (userRole === "vendedor" && podeManutencao(userEmail)) {
+    navigation = [...navigation, oficinaGroup];
+  }
 
   const initials = userName
     .split(" ")

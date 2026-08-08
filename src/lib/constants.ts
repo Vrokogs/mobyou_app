@@ -217,6 +217,14 @@ export type OrigemVenda = (typeof ORIGEM_VENDA)[number];
 // Montagem de motos: valor cobrado por hora de serviço
 export const VALOR_HORA_MONTAGEM = 250;
 
+// Vendedores que também executam a etapa de manutenção (acesso ao sistema de OS).
+// E-mails em minúsculo. Amplie esta lista para liberar OS a outros vendedores.
+export const VENDEDORES_MANUTENCAO = ['julia@mobyou.com'];
+
+export function podeManutencao(email?: string | null): boolean {
+  return !!email && VENDEDORES_MANUTENCAO.includes(email.toLowerCase());
+}
+
 // Folha de ponto: horário padrão de entrada e tolerância (minutos)
 export const PONTO_ENTRADA_PADRAO = '08:00';
 export const PONTO_TOLERANCIA_MIN = 10;

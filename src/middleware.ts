@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
 import type { Role } from '@/types/database';
+import { podeManutencao } from '@/lib/constants';
 
 const ROLE_ROUTES: Record<Role, string> = {
   gestor: '/gestor',
@@ -86,6 +87,10 @@ export async function middleware(request: NextRequest) {
 
   for (const { prefix, role } of PROTECTED_PREFIXES) {
     if (pathname.startsWith(prefix) && userRole !== role) {
+      // Exceção: vendedor habilitado à manutenção pode acessar as OS do técnico.
+      if (prefix === '/tecnico' && userRole === 'vendedor' && podeManutencao(user.email)) {
+        continue;
+      }
       const url = request.nextUrl.clone();
       url.pathname = getDashboardPath(userRole);
       return NextResponse.redirect(url);

@@ -14,10 +14,14 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
   Upload, FileText, CheckCircle2, Loader2, X, Plus, Trash2, Bike,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { NotaFiscal } from "@/types/database";
+import { UNIDADES_VENDA } from "@/lib/constants";
 
 interface ClienteData {
   nome: string;
@@ -43,6 +47,9 @@ interface VendaData {
   parcelas: string;
   data_compra: string;
   numero_nf: string;
+  forma_pagamento: string;
+  unidade: string;
+  vendedor_id: string;
 }
 
 interface ExtractedData {
@@ -58,7 +65,7 @@ const EMPTY_SCOOTER: ScooterData = {
 const EMPTY_DATA: ExtractedData = {
   cliente: { nome: "", cpf: "", telefone: "", email: "", endereco: "", senha: "" },
   scooters: [{ ...EMPTY_SCOOTER }],
-  venda: { valor: "", parcelas: "1", data_compra: new Date().toISOString().slice(0, 10), numero_nf: "" },
+  venda: { valor: "", parcelas: "1", data_compra: new Date().toISOString().slice(0, 10), numero_nf: "", forma_pagamento: "pix", unidade: "", vendedor_id: "" },
 };
 
 function cloneEmpty(): ExtractedData {
@@ -142,6 +149,17 @@ export default function ImportarNFPage() {
   const [imported, setImported] = useState(false);
   const [historico, setHistorico] = useState<(NotaFiscal & { cliente?: { nome: string } | null })[]>([]);
   const [loading, setLoading] = useState(true);
+  const [vendedores, setVendedores] = useState<{ id: string; nome: string }[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("profiles").select("id, nome")
+        .in("role", ["vendedor", "gestor"]).eq("ativo", true).order("nome");
+      setVendedores((data ?? []) as { id: string; nome: string }[]);
+    })();
+  }, []);
 
   const loadHistorico = useCallback(async () => {
     const supabase = createClient();
@@ -275,6 +293,14 @@ export default function ImportarNFPage() {
       toast.error("Informe o e-mail do cliente para criar a conta de acesso.");
       return;
     }
+    if (!venda.vendedor_id) {
+      toast.error("Selecione o vendedor que realizou a venda.");
+      return;
+    }
+    if (!venda.unidade) {
+      toast.error("Selecione a unidade (loja) da venda.");
+      return;
+    }
 
     const validScooters = scooters.filter((s) => s.modelo || s.chassi || s.numero_serie);
     if (validScooters.length === 0) {
@@ -356,6 +382,22 @@ export default function ImportarNFPage() {
           data_fim: dataFimStr,
           status: "ativa",
         });
+
+        // Registra a venda vinculada ao vendedor e à unidade (loja)
+        const itemValor = scooter.valor
+          ? parseFloat(scooter.valor)
+          : (validScooters.length === 1 && venda.valor ? parseFloat(venda.valor) : 0);
+        await (supabase.from("vendas") as any).insert({
+          vendedor_id: venda.vendedor_id,
+          cliente_id: clienteId,
+          scooter_id: scooterId,
+          valor_total: itemValor,
+          entrada: 0,
+          parcelas: venda.parcelas ? parseInt(venda.parcelas) : 1,
+          forma_pagamento: venda.forma_pagamento || "pix",
+          unidade: venda.unidade || null,
+          modelo: scooter.modelo || null,
+        });
       }
 
       // 3. Gera os 3 documentos (Contrato de Compra e Venda + 2 Termos) a partir
@@ -432,7 +474,7 @@ export default function ImportarNFPage() {
       });
 
       toast.success("Importacao concluida com sucesso!", {
-        description: `Cliente, ${validScooters.length} scooter(s), garantia(s) e contrato foram criados.`,
+        description: `Cliente, ${validScooters.length} scooter(s), garantia(s), venda(s) e contrato foram criados.`,
       });
       setImported(true);
       loadHistorico();
@@ -631,6 +673,49 @@ export default function ImportarNFPage() {
                       onChange={(e) => updateVenda("parcelas", e.target.value)}
                     />
                   </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Vendedor</Label>
+                    <Select
+                      items={Object.fromEntries(vendedores.map((v) => [v.id, v.nome]))}
+                      value={extractedData.venda.vendedor_id}
+                      onValueChange={(v) => updateVenda("vendedor_id", (v as string) ?? "")}
+                    >
+                      <SelectTrigger className="w-full"><SelectValue placeholder="Quem vendeu?" /></SelectTrigger>
+                      <SelectContent>
+                        {vendedores.map((v) => <SelectItem key={v.id} value={v.id}>{v.nome}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Unidade (loja)</Label>
+                    <Select
+                      value={extractedData.venda.unidade}
+                      onValueChange={(v) => updateVenda("unidade", (v as string) ?? "")}
+                    >
+                      <SelectTrigger className="w-full"><SelectValue placeholder="Selecione a loja" /></SelectTrigger>
+                      <SelectContent>
+                        {UNIDADES_VENDA.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Forma de Pagamento</Label>
+                  <Select
+                    value={extractedData.venda.forma_pagamento}
+                    onValueChange={(v) => updateVenda("forma_pagamento", (v as string) ?? "")}
+                  >
+                    <SelectTrigger className="w-full"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pix">PIX</SelectItem>
+                      <SelectItem value="cartao">Cartao</SelectItem>
+                      <SelectItem value="boleto">Boleto</SelectItem>
+                      <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                      <SelectItem value="financiamento">Financiamento</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="rounded-md bg-muted/50 px-3 py-2 text-sm flex items-center justify-between">
                   <span className="text-muted-foreground">Soma dos itens</span>

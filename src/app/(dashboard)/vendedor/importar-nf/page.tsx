@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { NotaFiscal } from "@/types/database";
+import { UNIDADES_VENDA } from "@/lib/constants";
 
 interface ClienteData {
   nome: string;
@@ -47,6 +48,7 @@ interface VendaData {
   data_compra: string;
   numero_nf: string;
   forma_pagamento: string;
+  unidade: string;
 }
 
 interface ExtractedData {
@@ -62,7 +64,7 @@ const EMPTY_SCOOTER: ScooterData = {
 const EMPTY_DATA: ExtractedData = {
   cliente: { nome: "", cpf: "", telefone: "", email: "", endereco: "", senha: "" },
   scooters: [{ ...EMPTY_SCOOTER }],
-  venda: { valor: "", parcelas: "1", data_compra: new Date().toISOString().slice(0, 10), numero_nf: "", forma_pagamento: "pix" },
+  venda: { valor: "", parcelas: "1", data_compra: new Date().toISOString().slice(0, 10), numero_nf: "", forma_pagamento: "pix", unidade: "" },
 };
 
 function cloneEmpty(): ExtractedData {
@@ -412,6 +414,8 @@ export default function VendedorImportarNFPage() {
           entrada: 0,
           parcelas,
           forma_pagamento: venda.forma_pagamento || "pix",
+          unidade: venda.unidade || null,
+          modelo: scooter.modelo || null,
           contrato_id: contratoId,
         });
       }
@@ -579,23 +583,39 @@ export default function VendedorImportarNFPage() {
                     <Input type="number" min="1" value={extractedData.venda.parcelas} onChange={(e) => updateVenda("parcelas", e.target.value)} />
                   </div>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Forma de Pagamento</Label>
-                  <Select
-                    value={extractedData.venda.forma_pagamento}
-                    onValueChange={(v) => updateVenda("forma_pagamento", (v as string) ?? "")}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pix">PIX</SelectItem>
-                      <SelectItem value="cartao">Cartao</SelectItem>
-                      <SelectItem value="boleto">Boleto</SelectItem>
-                      <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                      <SelectItem value="financiamento">Financiamento</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Forma de Pagamento</Label>
+                    <Select
+                      value={extractedData.venda.forma_pagamento}
+                      onValueChange={(v) => updateVenda("forma_pagamento", (v as string) ?? "")}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pix">PIX</SelectItem>
+                        <SelectItem value="cartao">Cartao</SelectItem>
+                        <SelectItem value="boleto">Boleto</SelectItem>
+                        <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                        <SelectItem value="financiamento">Financiamento</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Unidade (loja da venda)</Label>
+                    <Select
+                      value={extractedData.venda.unidade}
+                      onValueChange={(v) => updateVenda("unidade", (v as string) ?? "")}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Selecione a loja" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {UNIDADES_VENDA.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div className="rounded-md bg-muted/50 px-3 py-2 text-sm flex items-center justify-between">
                   <span className="text-muted-foreground">Soma dos itens</span>

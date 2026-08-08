@@ -284,7 +284,7 @@ export function EstoqueMotos() {
                   </p>
                   <div className="space-y-1">
                     <Label className="text-xs">Vendedor</Label>
-                    <Select value={form.vendedor_id} onValueChange={(v) => v && setForm((f) => ({ ...f, vendedor_id: v }))}>
+                    <Select items={Object.fromEntries(vendedores.map((v) => [v.id, v.nome]))} value={form.vendedor_id} onValueChange={(v) => v && setForm((f) => ({ ...f, vendedor_id: v }))}>
                       <SelectTrigger className="w-full"><SelectValue placeholder="Quem vendeu?" /></SelectTrigger>
                       <SelectContent>
                         {vendedores.map((v) => <SelectItem key={v.id} value={v.id}>{v.nome}</SelectItem>)}

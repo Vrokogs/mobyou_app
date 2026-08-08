@@ -173,7 +173,7 @@ export default function VendedorVendasPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Cliente (opcional)</Label>
-                <Select value={form.cliente_id} onValueChange={(v) => v && setForm({ ...form, cliente_id: v })}>
+                <Select items={Object.fromEntries(clientes.map((c) => [c.id, c.nome]))} value={form.cliente_id} onValueChange={(v) => v && setForm({ ...form, cliente_id: v })}>
                   <SelectTrigger className="w-full"><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
                   <SelectContent>
                     {clientes.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}

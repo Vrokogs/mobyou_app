@@ -111,7 +111,7 @@ export default function ClienteOrdensPage() {
             <form onSubmit={handleSolicitar} className="space-y-4">
               <div className="space-y-2">
                 <Label>Scooter</Label>
-                <Select value={form.scooter_id} onValueChange={v => setForm({...form, scooter_id: v ?? ""})}>
+                <Select items={Object.fromEntries(scooters.map((s) => [s.id, `${s.modelo}${s.chassi ? ` - ${s.chassi}` : ""}`]))} value={form.scooter_id} onValueChange={v => setForm({...form, scooter_id: v ?? ""})}>
                   <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
                     {scooters.map(s => <SelectItem key={s.id} value={s.id}>{s.modelo} - {s.chassi}</SelectItem>)}

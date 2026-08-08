@@ -101,7 +101,7 @@ export default function GestorRankingPage() {
           </h1>
           <p className="text-muted-foreground text-sm">Desempenho dos vendedores e visão geral das unidades</p>
         </div>
-        <Select value={periodo} onValueChange={(v) => v && setPeriodo(v)}>
+        <Select items={Object.fromEntries(opcoes.map((o) => [o.value, o.label]))} value={periodo} onValueChange={(v) => v && setPeriodo(v)}>
           <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
           <SelectContent>
             {opcoes.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}

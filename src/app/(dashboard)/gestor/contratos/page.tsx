@@ -140,6 +140,13 @@ export default function ContratosPage() {
     (m) => !newContrato.tipo || m.tipo === newContrato.tipo
   );
 
+  // Mapas valor->rótulo para o Select exibir o nome (não o código/UUID)
+  const modeloItems = Object.fromEntries(filteredModelos.map((m) => [m.id, m.titulo]));
+  const clienteItems = Object.fromEntries(clientes.map((c) => [c.id, c.nome]));
+  const scooterItems = Object.fromEntries(
+    scooters.map((s) => [s.id, `${s.modelo}${s.chassi ? ` - ${s.chassi}` : ""}`])
+  );
+
   function replaceVariables(conteudo: string, clienteId: string, scooterId: string) {
     const cliente = clientes.find((c) => c.id === clienteId);
     const scooter = scooters.find((s) => s.id === scooterId);
@@ -525,7 +532,7 @@ export default function ContratosPage() {
           <form onSubmit={handleCreateContrato} className="space-y-4">
             <div className="space-y-2">
               <Label>Tipo de Contrato</Label>
-              <Select value={newContrato.tipo} onValueChange={(v: string | null) => setNewContrato({ ...newContrato, tipo: v ?? "", modelo_id: "" })}>
+              <Select items={CONTRATO_TIPOS} value={newContrato.tipo} onValueChange={(v: string | null) => setNewContrato({ ...newContrato, tipo: v ?? "", modelo_id: "" })}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Selecione o tipo" />
                 </SelectTrigger>
@@ -539,7 +546,7 @@ export default function ContratosPage() {
 
             <div className="space-y-2">
               <Label>Modelo de Contrato</Label>
-              <Select value={newContrato.modelo_id} onValueChange={(v: string | null) => setNewContrato({ ...newContrato, modelo_id: v ?? "" })}>
+              <Select items={modeloItems} value={newContrato.modelo_id} onValueChange={(v: string | null) => setNewContrato({ ...newContrato, modelo_id: v ?? "" })}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Selecione um modelo (opcional)" />
                 </SelectTrigger>
@@ -553,7 +560,7 @@ export default function ContratosPage() {
 
             <div className="space-y-2">
               <Label>Cliente</Label>
-              <Select value={newContrato.cliente_id} onValueChange={(v: string | null) => setNewContrato({ ...newContrato, cliente_id: v ?? "" })}>
+              <Select items={clienteItems} value={newContrato.cliente_id} onValueChange={(v: string | null) => setNewContrato({ ...newContrato, cliente_id: v ?? "" })}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Selecione o cliente" />
                 </SelectTrigger>
@@ -567,7 +574,7 @@ export default function ContratosPage() {
 
             <div className="space-y-2">
               <Label>Scooter (opcional)</Label>
-              <Select value={newContrato.scooter_id} onValueChange={(v: string | null) => setNewContrato({ ...newContrato, scooter_id: v ?? "" })}>
+              <Select items={scooterItems} value={newContrato.scooter_id} onValueChange={(v: string | null) => setNewContrato({ ...newContrato, scooter_id: v ?? "" })}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Selecione a scooter" />
                 </SelectTrigger>
@@ -621,7 +628,7 @@ export default function ContratosPage() {
               </div>
               <div className="space-y-2">
                 <Label>Tipo</Label>
-                <Select value={newModelo.tipo} onValueChange={(v: string | null) => setNewModelo({ ...newModelo, tipo: v ?? "" })}>
+                <Select items={CONTRATO_TIPOS} value={newModelo.tipo} onValueChange={(v: string | null) => setNewModelo({ ...newModelo, tipo: v ?? "" })}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Selecione o tipo" />
                   </SelectTrigger>

@@ -20,7 +20,7 @@ import {
   LayoutDashboard, Users, Bike, ClipboardList, FileText, Wrench,
   Package, ShieldCheck, Award, Upload, DollarSign, Settings,
   LogOut, ChevronUp, UserCog, Hash, ShoppingCart,
-  Clock, Trophy, Radar,
+  Clock, Trophy, Radar, CalendarClock,
 } from "lucide-react";
 import { podeManutencao } from "@/lib/constants";
 
@@ -51,6 +51,7 @@ const gestorNav: NavGroup[] = [
       { title: "Ordens de Serviço", href: "/gestor/ordens", icon: ClipboardList },
       { title: "Orçamentos", href: "/gestor/orcamentos", icon: DollarSign },
       { title: "Garantias", href: "/gestor/garantias", icon: ShieldCheck },
+      { title: "Manutenções", href: "/gestor/manutencoes", icon: CalendarClock },
     ],
   },
   {

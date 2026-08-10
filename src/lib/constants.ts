@@ -136,6 +136,44 @@ export const GARANTIA_STATUS: Record<GarantiaStatus, string> = {
   cancelada: 'Cancelada',
 };
 
+// Modalidades de garantia por venda
+export const GARANTIA_MODALIDADES = [
+  { value: '1_ano', label: '1 ano', meses: 12 },
+  { value: '6_meses', label: '6 meses', meses: 6 },
+  { value: '3_meses', label: '3 meses', meses: 3 },
+] as const;
+
+export const GARANTIA_MODALIDADE_LABEL: Record<string, string> = {
+  '1_ano': '1 ano',
+  '6_meses': '6 meses',
+  '3_meses': '3 meses',
+};
+
+// Manutenção preventiva a cada 60 dias; horizonte padrão de 1 ano (6 preventivas)
+export const PREVENTIVA_INTERVALO_DIAS = 60;
+export const PREVENTIVA_QTD_PADRAO = 6;
+
+export const PREVENTIVA_STATUS: Record<string, string> = {
+  pendente: 'Pendente',
+  realizada: 'Realizada',
+  cancelada: 'Cancelada',
+};
+
+// Gera a agenda de preventivas (datas a cada 60 dias a partir de dataInicioISO)
+export function gerarDatasPreventivas(
+  dataInicioISO: string,
+  qtd: number = PREVENTIVA_QTD_PADRAO,
+): string[] {
+  const base = new Date(dataInicioISO + 'T12:00:00');
+  const datas: string[] = [];
+  for (let i = 1; i <= qtd; i++) {
+    const d = new Date(base);
+    d.setDate(d.getDate() + PREVENTIVA_INTERVALO_DIAS * i);
+    datas.push(d.toISOString().slice(0, 10));
+  }
+  return datas;
+}
+
 export const CONTRATO_TIPOS: Record<ContratoTipo, string> = {
   compra_venda: 'Compra e Venda',
   garantia: 'Garantia',

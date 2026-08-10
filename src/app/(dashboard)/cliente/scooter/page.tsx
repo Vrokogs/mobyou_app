@@ -8,7 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { createClient } from "@/lib/supabase/client";
-import { Bike, ShieldCheck, MapPin, Calendar, Hash, Battery, Cpu, Cog } from "lucide-react";
+import { Bike, ShieldCheck, MapPin, Calendar, Hash, Battery, Cpu, Cog, CalendarClock, Gift } from "lucide-react";
+import { GARANTIA_MODALIDADE_LABEL } from "@/lib/constants";
 
 interface ScooterFull {
   id: string;
@@ -24,8 +25,17 @@ interface ScooterFull {
 interface GarantiaInfo {
   id: string;
   status: string;
+  modalidade: string | null;
   data_inicio: string;
   data_fim: string;
+}
+
+interface PrevInfo {
+  id: string;
+  numero: number;
+  data_prevista: string;
+  gratuita: boolean;
+  status: string;
 }
 
 interface KmEntry {
@@ -40,6 +50,7 @@ export default function ClienteScooterPage() {
   const [scooter, setScooter] = useState<ScooterFull | null>(null);
   const [garantia, setGarantia] = useState<GarantiaInfo | null>(null);
   const [kmHistory, setKmHistory] = useState<KmEntry[]>([]);
+  const [preventivas, setPreventivas] = useState<PrevInfo[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -69,15 +80,17 @@ export default function ClienteScooterPage() {
         return;
       }
 
-      const [scooterRes, garantiaRes, kmRes] = await Promise.all([
+      const [scooterRes, garantiaRes, kmRes, prevRes] = await Promise.all([
         supabase.from("scooters").select("*").eq("id", sid).maybeSingle(),
-        supabase.from("garantias").select("id, status, data_inicio, data_fim").eq("scooter_id", sid).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+        supabase.from("garantias").select("id, status, modalidade, data_inicio, data_fim").eq("scooter_id", sid).order("created_at", { ascending: false }).limit(1).maybeSingle(),
         supabase.from("km_historico").select("id, km, created_at").eq("scooter_id", sid).order("created_at", { ascending: false }).limit(20),
+        supabase.from("manutencoes_preventivas").select("id, numero, data_prevista, gratuita, status").eq("scooter_id", sid).order("data_prevista", { ascending: true }),
       ]);
 
       if (scooterRes.data) setScooter(scooterRes.data as unknown as ScooterFull);
       if (garantiaRes.data) setGarantia(garantiaRes.data as unknown as GarantiaInfo);
       if (kmRes.data) setKmHistory(kmRes.data as unknown as KmEntry[]);
+      if (prevRes.data) setPreventivas(prevRes.data as unknown as PrevInfo[]);
       setLoading(false);
     }
     load();
@@ -180,7 +193,9 @@ export default function ClienteScooterPage() {
                 </div>
                 <Separator />
                 <div>
-                  <p className="text-sm font-medium mb-2">Cobertura — 1 ano</p>
+                  <p className="text-sm font-medium mb-2">
+                    Cobertura — {GARANTIA_MODALIDADE_LABEL[garantia.modalidade ?? "1_ano"] ?? "1 ano"}
+                  </p>
                   <div className="grid grid-cols-3 gap-2">
                     <div className="rounded-lg border bg-emerald-50/50 p-3 text-center">
                       <Battery className="h-5 w-5 mx-auto text-emerald-600" />
@@ -196,11 +211,48 @@ export default function ClienteScooterPage() {
                     </div>
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-2">
-                    Garantia de 1 ano contra defeitos de fabricação do módulo, motor e
-                    bateria. Não cobre peças de desgaste (pneus, freios, lâmpadas e
-                    carregadores) nem danos por mau uso ou modificações.
+                    Garantia contra defeitos de fabricação do módulo, motor e bateria.
+                    Não cobre peças de desgaste (pneus, freios, lâmpadas e carregadores)
+                    nem danos por mau uso ou modificações.
                   </p>
                 </div>
+
+                {preventivas.length > 0 && (
+                  <>
+                    <Separator />
+                    <div>
+                      <p className="text-sm font-medium mb-2 flex items-center gap-1">
+                        <CalendarClock className="h-4 w-4" /> Manutenções preventivas (a cada 60 dias)
+                      </p>
+                      <div className="space-y-1.5">
+                        {preventivas.map((p) => {
+                          const hoje = new Date().toISOString().slice(0, 10);
+                          const vencida = p.status === "pendente" && p.data_prevista < hoje;
+                          return (
+                            <div key={p.id} className="flex items-center justify-between rounded-md border px-3 py-1.5 text-sm">
+                              <span className="flex items-center gap-2">
+                                <span className="font-medium">{p.numero}ª</span>
+                                <span className={vencida ? "text-red-600" : "text-muted-foreground"}>
+                                  {new Date(p.data_prevista + "T12:00:00").toLocaleDateString("pt-BR")}
+                                </span>
+                                {p.gratuita && (
+                                  <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 gap-1 text-[10px]">
+                                    <Gift className="h-3 w-3" /> Grátis
+                                  </Badge>
+                                )}
+                              </span>
+                              {p.status === "realizada"
+                                ? <Badge variant="secondary" className="bg-green-100 text-green-800">Feita</Badge>
+                                : vencida
+                                  ? <Badge variant="secondary" className="bg-red-100 text-red-800">Vencida</Badge>
+                                  : <Badge variant="secondary" className="bg-blue-100 text-blue-800">Agendada</Badge>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
                 {garantiaAtiva && (
                   <>
                     <Separator />

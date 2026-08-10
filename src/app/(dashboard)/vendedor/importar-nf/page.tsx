@@ -21,7 +21,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { NotaFiscal } from "@/types/database";
-import { UNIDADES_VENDA } from "@/lib/constants";
+import { UNIDADES_VENDA, GARANTIA_MODALIDADES, gerarDatasPreventivas } from "@/lib/constants";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface ClienteData {
   nome: string;
@@ -50,6 +51,8 @@ interface VendaData {
   forma_pagamento: string;
   unidade: string;
   vendedor_id: string;
+  modalidade: string;
+  primeira_gratuita: boolean;
 }
 
 interface ExtractedData {
@@ -65,7 +68,7 @@ const EMPTY_SCOOTER: ScooterData = {
 const EMPTY_DATA: ExtractedData = {
   cliente: { nome: "", cpf: "", telefone: "", email: "", endereco: "", senha: "" },
   scooters: [{ ...EMPTY_SCOOTER }],
-  venda: { valor: "", parcelas: "1", data_compra: new Date().toISOString().slice(0, 10), numero_nf: "", forma_pagamento: "pix", unidade: "", vendedor_id: "" },
+  venda: { valor: "", parcelas: "1", data_compra: new Date().toISOString().slice(0, 10), numero_nf: "", forma_pagamento: "pix", unidade: "", vendedor_id: "", modalidade: "1_ano", primeira_gratuita: true },
 };
 
 function cloneEmpty(): ExtractedData {
@@ -264,7 +267,7 @@ export default function VendedorImportarNFPage() {
     );
   }
 
-  function updateVenda(field: keyof VendaData, value: string) {
+  function updateVenda(field: keyof VendaData, value: string | boolean) {
     setExtractedData((prev) =>
       prev ? { ...prev, venda: { ...prev.venda, [field]: value } } : prev
     );
@@ -351,8 +354,9 @@ export default function VendedorImportarNFPage() {
       }
 
       const dataInicio = venda.data_compra || new Date().toISOString().slice(0, 10);
-      const dataFim = new Date(dataInicio);
-      dataFim.setFullYear(dataFim.getFullYear() + 1);
+      const meses = GARANTIA_MODALIDADES.find((m) => m.value === venda.modalidade)?.meses ?? 12;
+      const dataFim = new Date(dataInicio + "T12:00:00");
+      dataFim.setMonth(dataFim.getMonth() + meses);
       const dataFimStr = dataFim.toISOString().slice(0, 10);
       const parcelas = parseInt(venda.parcelas) || 1;
 
@@ -408,14 +412,26 @@ export default function VendedorImportarNFPage() {
         }
         const scooterId = (scooterData as any).id;
 
-        await (supabase.from("garantias") as any).insert({
+        const { data: garRow } = await (supabase.from("garantias") as any).insert({
           scooter_id: scooterId,
           cliente_id: clienteId,
+          modalidade: venda.modalidade,
           data_compra: dataInicio,
           data_inicio: dataInicio,
           data_fim: dataFimStr,
           status: "ativa",
-        });
+        }).select("id").single();
+
+        const preventivas = gerarDatasPreventivas(dataInicio).map((d, i) => ({
+          scooter_id: scooterId,
+          cliente_id: clienteId,
+          garantia_id: garRow?.id ?? null,
+          numero: i + 1,
+          data_prevista: d,
+          gratuita: i === 0 && venda.primeira_gratuita,
+          status: "pendente",
+        }));
+        await (supabase.from("manutencoes_preventivas") as any).insert(preventivas);
 
         const { data: contratoData } = await (supabase.from("contratos") as any).insert({
           tipo: "compra_venda" as const,
@@ -668,6 +684,29 @@ export default function VendedorImportarNFPage() {
                       {vendedores.map((v) => <SelectItem key={v.id} value={v.id}>{v.nome}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50/40 p-3 space-y-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Garantia</Label>
+                    <Select
+                      items={Object.fromEntries(GARANTIA_MODALIDADES.map((m) => [m.value, m.label]))}
+                      value={extractedData.venda.modalidade}
+                      onValueChange={(v) => updateVenda("modalidade", (v as string) ?? "")}
+                    >
+                      <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {GARANTIA_MODALIDADES.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <label className="flex items-center gap-2 text-xs cursor-pointer">
+                    <Checkbox
+                      checked={extractedData.venda.primeira_gratuita}
+                      onCheckedChange={(c) => updateVenda("primeira_gratuita", c === true)}
+                    />
+                    1ª manutenção preventiva gratuita
+                  </label>
+                  <p className="text-[11px] text-muted-foreground">Preventivas a cada 60 dias serão agendadas automaticamente.</p>
                 </div>
                 <div className="rounded-md bg-muted/50 px-3 py-2 text-sm flex items-center justify-between">
                   <span className="text-muted-foreground">Soma dos itens</span>

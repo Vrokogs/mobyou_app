@@ -75,6 +75,7 @@ export type Garantia = {
   scooter_id: string;
   cliente_id: string;
   tipo: string | null;
+  modalidade: string | null;
   data_compra: string | null;
   data_inicio: string;
   data_fim: string;
@@ -82,6 +83,26 @@ export type Garantia = {
   created_at: string;
   updated_at: string;
 };
+
+export type ManutencaoPreventiva = {
+  id: string;
+  scooter_id: string | null;
+  cliente_id: string | null;
+  garantia_id: string | null;
+  numero: number;
+  data_prevista: string;
+  gratuita: boolean;
+  status: string;
+  realizada_em: string | null;
+  ordem_id: string | null;
+  observacoes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+export type ManutencaoPreventivaInsert = Omit<ManutencaoPreventiva, 'id' | 'created_at' | 'updated_at'> & {
+  id?: string; created_at?: string; updated_at?: string;
+};
+export type ManutencaoPreventivaUpdate = Partial<ManutencaoPreventivaInsert>;
 
 export type OrdemServico = {
   id: string;
@@ -570,6 +591,7 @@ export type Database = {
       folha_ponto: TableDefinition<FolhaPonto, FolhaPontoInsert, FolhaPontoUpdate>;
       leads: TableDefinition<Lead, LeadInsert, LeadUpdate>;
       montagens: TableDefinition<Montagem, MontagemInsert, MontagemUpdate>;
+      manutencoes_preventivas: TableDefinition<ManutencaoPreventiva, ManutencaoPreventivaInsert, ManutencaoPreventivaUpdate>;
     };
     Views: { [_ in never]: never };
     Functions: { [_ in never]: never };

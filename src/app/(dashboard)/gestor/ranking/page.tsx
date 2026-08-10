@@ -8,8 +8,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Trophy, Medal, TrendingUp, Store, Bike } from "lucide-react";
-import { UNIDADES_VENDA } from "@/lib/constants";
+import { Trophy, Medal, TrendingUp, Store, Bike, Building2 } from "lucide-react";
+import { UNIDADES_VENDA, VENDEDORES_ATACADO } from "@/lib/constants";
 
 interface Venda {
   id: string;
@@ -17,9 +17,12 @@ interface Venda {
   modelo: string | null;
   valor_total: number | null;
   vendedor_id: string;
+  unidade_negocio: string | null;
   created_at: string;
   vendedor: { nome: string } | null;
 }
+
+interface Vendedor { id: string; nome: string; email: string; ativo: boolean }
 
 const brl = (n: number) => "R$ " + n.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
 
@@ -28,7 +31,7 @@ const medalha = ["text-yellow-500", "text-gray-400", "text-amber-700"];
 
 export default function GestorRankingPage() {
   const [vendas, setVendas] = useState<Venda[]>([]);
-  const [vendedores, setVendedores] = useState<{ id: string; nome: string }[]>([]);
+  const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [loading, setLoading] = useState(true);
   const now = new Date();
   const [periodo, setPeriodo] = useState<string>(`${now.getFullYear()}-${now.getMonth()}`);
@@ -38,10 +41,10 @@ export default function GestorRankingPage() {
       const supabase = createClient();
       const [vRes, pRes] = await Promise.all([
         supabase.from("vendas").select("*, vendedor:profiles!vendedor_id(nome)").order("created_at", { ascending: false }),
-        supabase.from("profiles").select("id, nome").eq("role", "vendedor").eq("ativo", true).order("nome"),
+        supabase.from("profiles").select("id, nome, email, ativo").eq("role", "vendedor").order("nome"),
       ]);
       setVendas((vRes.data ?? []) as unknown as Venda[]);
-      setVendedores((pRes.data ?? []) as { id: string; nome: string }[]);
+      setVendedores((pRes.data ?? []) as unknown as Vendedor[]);
       setLoading(false);
     }
     load();
@@ -53,16 +56,34 @@ export default function GestorRankingPage() {
     return d.getFullYear() === ano && (mes === -1 || d.getMonth() === mes);
   });
 
-  // Ranking: inclui TODOS os vendedores (mesmo os que não venderam)
-  const porVendedor = vendedores.map((vd) => {
-    const suas = doPeriodo.filter((v) => v.vendedor_id === vd.id);
-    return {
-      id: vd.id,
-      nome: vd.nome,
-      qtd: suas.length,
-      total: suas.reduce((s, v) => s + (v.valor_total ?? 0), 0),
-    };
-  }).sort((a, b) => b.total - a.total || b.qtd - a.qtd);
+  // Separa varejo x atacado
+  const vendasVarejo = doPeriodo.filter((v) => (v.unidade_negocio ?? "varejo") !== "atacado");
+  const vendasAtacado = doPeriodo.filter((v) => v.unidade_negocio === "atacado");
+
+  const ativos = vendedores.filter((v) => v.ativo);
+  const ativosIds = new Set(ativos.map((v) => v.id));
+
+  // Ranking do VAREJO: vendedores ativos individualmente
+  const porVendedor = ativos.map((vd) => {
+    const suas = vendasVarejo.filter((v) => v.vendedor_id === vd.id);
+    return { id: vd.id, nome: vd.nome, qtd: suas.length, total: suas.reduce((s, v) => s + (v.valor_total ?? 0), 0) };
+  });
+
+  // Outros colaboradores: vendas de varejo de vendedores inativos / que saíram
+  const vendasOutros = vendasVarejo.filter((v) => !ativosIds.has(v.vendedor_id));
+  if (vendasOutros.length > 0) {
+    porVendedor.push({
+      id: "outros", nome: "Outros Colaboradores",
+      qtd: vendasOutros.length,
+      total: vendasOutros.reduce((s, v) => s + (v.valor_total ?? 0), 0),
+    });
+  }
+  porVendedor.sort((a, b) => b.total - a.total || b.qtd - a.qtd);
+
+  // Atacado (Julia + Robert): total somado e dividido 50/50
+  const totalAtacado = vendasAtacado.reduce((s, v) => s + (v.valor_total ?? 0), 0);
+  const qtdAtacado = vendasAtacado.length;
+  const duplaAtacado = vendedores.filter((v) => VENDEDORES_ATACADO.includes((v.email || "").toLowerCase()));
 
   const maxTotal = Math.max(1, ...porVendedor.map((v) => v.total));
   const totalGeral = porVendedor.reduce((s, v) => s + v.total, 0);
@@ -99,7 +120,7 @@ export default function GestorRankingPage() {
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
             <Trophy className="h-6 w-6 text-yellow-500" /> Ranking & Competição
           </h1>
-          <p className="text-muted-foreground text-sm">Desempenho dos vendedores e visão geral das unidades</p>
+          <p className="text-muted-foreground text-sm">Varejo (por vendedor) e Atacado (Julia + Robert, 50/50)</p>
         </div>
         <Select items={Object.fromEntries(opcoes.map((o) => [o.value, o.label]))} value={periodo} onValueChange={(v) => v && setPeriodo(v)}>
           <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
@@ -120,13 +141,42 @@ export default function GestorRankingPage() {
         </CardContent></Card>
         <Card><CardContent className="pt-4">
           <p className="text-xs text-muted-foreground">Vendedores que venderam</p>
-          <p className="text-2xl font-bold mt-1">{venderam} <span className="text-base text-muted-foreground font-normal">/ {vendedores.length}</span></p>
+          <p className="text-2xl font-bold mt-1">{venderam} <span className="text-base text-muted-foreground font-normal">/ {ativos.length}</span></p>
         </CardContent></Card>
       </div>
 
-      {/* Ranking de vendedores — gráfico de barras */}
+      {/* Atacado — Julia + Robert, dividido 50/50 */}
+      <Card className="border-purple-200 bg-purple-50/30">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2"><Building2 className="h-4 w-4 text-purple-600" /> Atacado — Julia & Robert (50/50)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <div>
+              <p className="text-xs text-muted-foreground">Total do atacado no período</p>
+              <p className="text-2xl font-bold text-purple-700">{brl(totalAtacado)}</p>
+              <p className="text-xs text-muted-foreground">{qtdAtacado} venda(s) de atacado</p>
+            </div>
+            <p className="text-xs text-muted-foreground max-w-xs">
+              As vendas de atacado são somadas e divididas igualmente entre Julia e Robert,
+              independentemente de quem lançou cada uma.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {(duplaAtacado.length ? duplaAtacado : [{ id: "j", nome: "Julia" }, { id: "r", nome: "Robert" }]).map((v) => (
+              <div key={v.id} className="rounded-lg border bg-white p-3 text-center">
+                <p className="text-sm font-medium">{v.nome}</p>
+                <p className="text-xl font-bold text-purple-700 mt-1">{brl(totalAtacado / 2)}</p>
+                <p className="text-[11px] text-muted-foreground">50% do atacado</p>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Ranking do VAREJO — gráfico de barras */}
       <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2"><Medal className="h-4 w-4" /> Ranking de vendedores</CardTitle></CardHeader>
+        <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2"><Medal className="h-4 w-4" /> Ranking de vendedores — Varejo</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           {porVendedor.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">Nenhum vendedor cadastrado.</p>

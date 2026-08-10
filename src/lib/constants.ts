@@ -239,6 +239,25 @@ export const ESTOQUE_ESTADOS = [
   'Avariada',
 ] as const;
 
+// Unidades de negócio da empresa (dimensão separada das lojas físicas)
+export const UNIDADES_NEGOCIO = [
+  { value: 'varejo', label: 'Varejo', descricao: 'Vendas diretas ao consumidor final' },
+  { value: 'atacado', label: 'Atacado', descricao: 'Vendas para lojistas, revendedores e parceiros' },
+  { value: 'pecas', label: 'Peças de reposição', descricao: 'Peças vendidas separadamente' },
+  { value: 'oficina', label: 'Oficina', descricao: 'Manutenção, revisão, garantia e mão de obra' },
+] as const;
+
+export const UNIDADE_NEGOCIO_LABEL: Record<string, string> = {
+  varejo: 'Varejo',
+  atacado: 'Atacado',
+  pecas: 'Peças de reposição',
+  oficina: 'Oficina',
+};
+
+// Vendedores que operam no atacado (Julia + Robert) — vendas de atacado somadas e
+// divididas 50/50 entre eles (regra do briefing).
+export const VENDEDORES_ATACADO = ['julia@mobyou.com', 'robert@mobyou.com'];
+
 // Origem do lead / da venda (de onde veio o cliente)
 export const ORIGEM_VENDA = [
   'Lead',

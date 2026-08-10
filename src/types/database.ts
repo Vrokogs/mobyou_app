@@ -309,8 +309,24 @@ export type Venda = {
   origem: string | null;
   lead_id: string | null;
   chassi: string | null;
+  unidade_negocio: string | null;
   created_at: string;
 };
+
+export type VendaPeca = {
+  id: string;
+  descricao: string;
+  quantidade: number;
+  valor_total: number;
+  unidade: string | null;
+  vendedor_id: string | null;
+  cliente_id: string | null;
+  forma_pagamento: string | null;
+  observacoes: string | null;
+  created_at: string;
+};
+export type VendaPecaInsert = Omit<VendaPeca, 'id' | 'created_at'> & { id?: string; created_at?: string };
+export type VendaPecaUpdate = Partial<VendaPecaInsert>;
 
 export type EstoqueMoto = {
   id: string;
@@ -592,6 +608,7 @@ export type Database = {
       leads: TableDefinition<Lead, LeadInsert, LeadUpdate>;
       montagens: TableDefinition<Montagem, MontagemInsert, MontagemUpdate>;
       manutencoes_preventivas: TableDefinition<ManutencaoPreventiva, ManutencaoPreventivaInsert, ManutencaoPreventivaUpdate>;
+      vendas_pecas: TableDefinition<VendaPeca, VendaPecaInsert, VendaPecaUpdate>;
     };
     Views: { [_ in never]: never };
     Functions: { [_ in never]: never };

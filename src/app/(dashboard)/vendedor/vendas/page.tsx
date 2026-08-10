@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { Plus, Search, DollarSign, Loader2, Trash2 } from "lucide-react";
-import { UNIDADES_VENDA, MOBYOU_MODELOS, ORIGEM_VENDA } from "@/lib/constants";
+import { UNIDADES_VENDA, MOBYOU_MODELOS, ORIGEM_VENDA, UNIDADES_NEGOCIO } from "@/lib/constants";
 
 interface Venda {
   id: string;
@@ -54,6 +54,7 @@ export default function VendedorVendasPage() {
     parcelas: "1",
     forma_pagamento: "pix",
     origem: "Lead",
+    unidade_negocio: "varejo",
   });
 
   useEffect(() => { loadData(); }, []);
@@ -112,6 +113,7 @@ export default function VendedorVendasPage() {
         parcelas: parseInt(form.parcelas) || 1,
         forma_pagamento: form.forma_pagamento,
         origem: form.origem,
+        unidade_negocio: form.unidade_negocio,
       });
       if (error) {
         toast.error("Erro ao registrar venda", { description: error.message });
@@ -119,7 +121,7 @@ export default function VendedorVendasPage() {
       }
       toast.success("Venda registrada com sucesso!");
       setDialogOpen(false);
-      setForm({ unidade: UNIDADES_VENDA[0], modelo: "", cliente_id: "", valor_total: "", entrada: "0", parcelas: "1", forma_pagamento: "pix", origem: "Lead" });
+      setForm({ unidade: UNIDADES_VENDA[0], modelo: "", cliente_id: "", valor_total: "", entrada: "0", parcelas: "1", forma_pagamento: "pix", origem: "Lead", unidade_negocio: "varejo" });
       loadData();
     } catch {
       toast.error("Erro inesperado");
@@ -170,14 +172,30 @@ export default function VendedorVendasPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Origem da venda (de onde veio o cliente)</Label>
-                <Select value={form.origem} onValueChange={(v) => v && setForm({ ...form, origem: v })}>
-                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {ORIGEM_VENDA.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Origem (de onde veio)</Label>
+                  <Select value={form.origem} onValueChange={(v) => v && setForm({ ...form, origem: v })}>
+                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {ORIGEM_VENDA.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Unidade de negócio</Label>
+                  <Select
+                    items={Object.fromEntries(UNIDADES_NEGOCIO.filter((u) => u.value === "varejo" || u.value === "atacado").map((u) => [u.value, u.label]))}
+                    value={form.unidade_negocio}
+                    onValueChange={(v) => v && setForm({ ...form, unidade_negocio: v })}
+                  >
+                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="varejo">Varejo</SelectItem>
+                      <SelectItem value="atacado">Atacado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Modelo da moto</Label>

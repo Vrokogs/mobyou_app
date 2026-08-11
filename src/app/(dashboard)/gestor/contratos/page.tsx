@@ -261,7 +261,7 @@ export default function ContratosPage() {
           toast.success("Modelo atualizado!");
         }
       } else {
-        const { error } = await supabase.from("modelos_contrato").insert({
+        const { error } = await (supabase.from("modelos_contrato") as any).insert({
           titulo: newModelo.titulo,
           tipo: newModelo.tipo as ContratoTipo,
           conteudo_template: newModelo.conteudo_template,

@@ -444,21 +444,26 @@ export default function ImportarNFPage() {
 
       const { data: modelos } = await supabase
         .from("modelos_contrato")
-        .select("tipo, titulo, conteudo_template")
+        .select("tipo, titulo, conteudo_template, modalidade")
         .in("tipo", ["compra_venda", "entrega", "desbloqueio"])
         .eq("ativo", true);
 
       if (modelos && modelos.length > 0) {
-        const docs = (modelos as { tipo: string; titulo: string; conteudo_template: string }[]).map(
-          (mod) => ({
+        // Para compra_venda, usa o contrato da modalidade de garantia escolhida
+        const selecionados = (modelos as { tipo: string; titulo: string; conteudo_template: string; modalidade: string | null }[])
+          .filter((m) => m.tipo !== "compra_venda" || m.modalidade === venda.modalidade || m.modalidade == null);
+        // Se houver o específico da modalidade, descarta o genérico (modalidade null)
+        const temEspecifico = selecionados.some((m) => m.tipo === "compra_venda" && m.modalidade === venda.modalidade);
+        const docs = selecionados
+          .filter((m) => !(temEspecifico && m.tipo === "compra_venda" && m.modalidade == null))
+          .map((mod) => ({
             tipo: mod.tipo,
             titulo: mod.titulo,
             cliente_id: clienteId,
             scooter_id: createdScooterIds[0] ?? null,
             conteudo: aplicar(mod.conteudo_template),
             status: "enviado" as const,
-          })
-        );
+          }));
         await (supabase.from("contratos") as any).insert(docs);
       }
 

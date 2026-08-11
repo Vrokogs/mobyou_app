@@ -237,6 +237,7 @@ export type ModeloContrato = {
   tipo: ContratoTipo;
   titulo: string;
   conteudo_template: string;
+  modalidade: string | null;
   variaveis_disponiveis: string[];
   criado_por: string;
   ativo: boolean;

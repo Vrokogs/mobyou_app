@@ -392,6 +392,15 @@ export default function VendedorImportarNFPage() {
       }).select("id").single();
       const notaFiscalId = (nfData as any)?.id ?? null;
 
+      // Modelo de contrato de compra e venda conforme a modalidade de garantia
+      const { data: modelosCV } = await supabase
+        .from("modelos_contrato")
+        .select("titulo, conteudo_template, modalidade")
+        .eq("tipo", "compra_venda").eq("ativo", true);
+      const listaCV = (modelosCV ?? []) as { titulo: string; conteudo_template: string; modalidade: string | null }[];
+      const modeloCV = listaCV.find((m) => m.modalidade === venda.modalidade) ?? listaCV[0] ?? null;
+      const dataExt = new Date().toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" });
+
       // 2. Para cada scooter: scooter + garantia + contrato + venda
       for (const scooter of validScooters) {
         const { data: scooterData, error: scooterError } = await (supabase.from("scooters") as any).insert({
@@ -435,19 +444,25 @@ export default function VendedorImportarNFPage() {
         }));
         await (supabase.from("manutencoes_preventivas") as any).insert(preventivas);
 
+        const conteudoContrato = modeloCV
+          ? modeloCV.conteudo_template
+              .replace(/\{\{cliente_nome\}\}/g, cliente.nome || "")
+              .replace(/\{\{cliente_cpf\}\}/g, cliente.cpf || "")
+              .replace(/\{\{cliente_endereco\}\}/g, cliente.endereco || "")
+              .replace(/\{\{scooter_marca\}\}/g, scooter.marca || "")
+              .replace(/\{\{scooter_modelo\}\}/g, scooter.modelo || "")
+              .replace(/\{\{scooter_ano\}\}/g, scooter.ano || "")
+              .replace(/\{\{scooter_cor\}\}/g, scooter.cor || "")
+              .replace(/\{\{scooter_chassi\}\}/g, scooter.chassi || "")
+              .replace(/\{\{data_extenso\}\}/g, dataExt)
+          : `Contrato de Compra e Venda — ${cliente.nome} — ${scooter.modelo}`;
         const { data: contratoData } = await (supabase.from("contratos") as any).insert({
           tipo: "compra_venda" as const,
-          titulo: `Compra e Venda - ${cliente.nome}`,
-          conteudo: `<h2>Contrato de Compra e Venda</h2>
-<p>Contrato gerado pela importacao da NF ${venda.numero_nf || ""}.</p>
-<p><strong>Cliente:</strong> ${cliente.nome}</p>
-<p><strong>CPF:</strong> ${cliente.cpf}</p>
-<p><strong>Scooter:</strong> ${scooter.modelo} ${scooter.marca}</p>
-<p><strong>Chassi:</strong> ${scooter.chassi || "N/A"}</p>
-<p><strong>Valor:</strong> R$ ${scooter.valor || "0,00"}</p>`,
+          titulo: modeloCV?.titulo ?? `Compra e Venda - ${cliente.nome}`,
+          conteudo: conteudoContrato,
           cliente_id: clienteId,
           scooter_id: scooterId,
-          status: "rascunho" as const,
+          status: "enviado" as const,
         }).select("id").single();
         const contratoId = (contratoData as any)?.id ?? null;
 

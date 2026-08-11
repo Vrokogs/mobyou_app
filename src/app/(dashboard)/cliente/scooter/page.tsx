@@ -35,6 +35,7 @@ interface PrevInfo {
   numero: number;
   data_prevista: string;
   gratuita: boolean;
+  obrigatoria: boolean;
   status: string;
 }
 
@@ -84,7 +85,7 @@ export default function ClienteScooterPage() {
         supabase.from("scooters").select("*").eq("id", sid).maybeSingle(),
         supabase.from("garantias").select("id, status, modalidade, data_inicio, data_fim").eq("scooter_id", sid).order("created_at", { ascending: false }).limit(1).maybeSingle(),
         supabase.from("km_historico").select("id, km, created_at").eq("scooter_id", sid).order("created_at", { ascending: false }).limit(20),
-        supabase.from("manutencoes_preventivas").select("id, numero, data_prevista, gratuita, status").eq("scooter_id", sid).order("data_prevista", { ascending: true }),
+        supabase.from("manutencoes_preventivas").select("id, numero, data_prevista, gratuita, obrigatoria, status").eq("scooter_id", sid).order("data_prevista", { ascending: true }),
       ]);
 
       if (scooterRes.data) setScooter(scooterRes.data as unknown as ScooterFull);
@@ -221,8 +222,13 @@ export default function ClienteScooterPage() {
                   <>
                     <Separator />
                     <div>
-                      <p className="text-sm font-medium mb-2 flex items-center gap-1">
-                        <CalendarClock className="h-4 w-4" /> Manutenções preventivas (a cada 60 dias)
+                      <p className="text-sm font-medium mb-1 flex items-center gap-1">
+                        <CalendarClock className="h-4 w-4" /> Revisões / manutenções (R$ 300 • 1ª grátis)
+                      </p>
+                      <p className="text-[11px] text-muted-foreground mb-2">
+                        {(garantia?.modalidade === "3_meses")
+                          ? "Revisão sugestiva — pode ser feita dentro dos 90 dias, não é obrigatória para a garantia."
+                          : "As revisões são obrigatórias para manter a garantia."}
                       </p>
                       <div className="space-y-1.5">
                         {preventivas.map((p) => {

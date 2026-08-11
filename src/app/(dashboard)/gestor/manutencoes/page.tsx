@@ -18,11 +18,15 @@ interface Prev {
   numero: number;
   data_prevista: string;
   gratuita: boolean;
+  obrigatoria: boolean;
+  valor: number | null;
   status: string;
   realizada_em: string | null;
   scooter: { modelo: string; chassi: string | null } | null;
   cliente: { nome: string } | null;
 }
+
+const brl = (n: number) => "R$ " + n.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
 
 const hojeISO = () => new Date().toISOString().slice(0, 10);
 const fmt = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("pt-BR");
@@ -36,7 +40,7 @@ export default function GestorManutencoesPage() {
     const supabase = createClient();
     const { data } = await supabase
       .from("manutencoes_preventivas")
-      .select("id, numero, data_prevista, gratuita, status, realizada_em, scooter:scooters!scooter_id(modelo, chassi), cliente:profiles!cliente_id(nome)")
+      .select("id, numero, data_prevista, gratuita, obrigatoria, valor, status, realizada_em, scooter:scooters!scooter_id(modelo, chassi), cliente:profiles!cliente_id(nome)")
       .order("data_prevista", { ascending: true });
     setRows((data ?? []) as unknown as Prev[]);
     setLoading(false);
@@ -123,7 +127,8 @@ export default function GestorManutencoesPage() {
                     <TableHead>Scooter</TableHead>
                     <TableHead>Nº</TableHead>
                     <TableHead>Data prevista</TableHead>
-                    <TableHead>Gratuita</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Valor</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
@@ -136,10 +141,15 @@ export default function GestorManutencoesPage() {
                       <TableCell>{p.numero}ª</TableCell>
                       <TableCell className={isVencida(p) ? "text-red-600 font-medium" : ""}>{fmt(p.data_prevista)}</TableCell>
                       <TableCell>
+                        {p.obrigatoria
+                          ? <Badge variant="secondary" className="bg-orange-100 text-orange-800">Obrigatória</Badge>
+                          : <Badge variant="outline" className="text-muted-foreground">Sugestiva</Badge>}
+                      </TableCell>
+                      <TableCell>
                         <button onClick={() => toggleGratuita(p)} title="Alternar gratuita">
                           {p.gratuita
                             ? <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 gap-1"><Gift className="h-3 w-3" /> Grátis</Badge>
-                            : <Badge variant="outline" className="text-muted-foreground">Cobrada</Badge>}
+                            : <span className="font-medium">{brl(p.valor ?? 300)}</span>}
                         </button>
                       </TableCell>
                       <TableCell>

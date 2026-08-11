@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { NotaFiscal } from "@/types/database";
-import { UNIDADES_VENDA, GARANTIA_MODALIDADES, gerarDatasPreventivas } from "@/lib/constants";
+import { UNIDADES_VENDA, GARANTIA_MODALIDADES, gerarPreventivas } from "@/lib/constants";
 import { Checkbox } from "@/components/ui/checkbox";
 
 interface ClienteData {
@@ -388,15 +388,16 @@ export default function ImportarNFPage() {
           status: "ativa",
         }).select("id").single();
 
-        // Agenda das manutenções preventivas (a cada 60 dias); 1ª pode ser gratuita
-        const datasPrev = gerarDatasPreventivas(dataInicio);
-        const preventivas = datasPrev.map((d, i) => ({
+        // Agenda das revisões conforme a modalidade (3m=sugestiva; 6m/1a=obrigatória)
+        const preventivas = gerarPreventivas(dataInicio, venda.modalidade, venda.primeira_gratuita).map((p) => ({
           scooter_id: scooterId,
           cliente_id: clienteId,
           garantia_id: garRow?.id ?? null,
-          numero: i + 1,
-          data_prevista: d,
-          gratuita: i === 0 && venda.primeira_gratuita,
+          numero: p.numero,
+          data_prevista: p.data_prevista,
+          gratuita: p.gratuita,
+          obrigatoria: p.obrigatoria,
+          valor: p.valor,
           status: "pendente",
         }));
         await (supabase.from("manutencoes_preventivas") as any).insert(preventivas);
@@ -405,7 +406,7 @@ export default function ImportarNFPage() {
         const itemValor = scooter.valor
           ? parseFloat(scooter.valor)
           : (validScooters.length === 1 && venda.valor ? parseFloat(venda.valor) : 0);
-        const { data: vendaRow } = await (supabase.from("vendas") as any).insert({
+        await (supabase.from("vendas") as any).insert({
           vendedor_id: venda.vendedor_id,
           cliente_id: clienteId,
           scooter_id: scooterId,
@@ -416,15 +417,7 @@ export default function ImportarNFPage() {
           unidade: venda.unidade || null,
           modelo: scooter.modelo || null,
           chassi: scooter.chassi || null,
-        }).select("id").single();
-
-        // Conferência por chassi: casa a moto no estoque e vira Disponível -> Vendido
-        if (scooter.chassi) {
-          await (supabase.from("estoque_motos") as any)
-            .update({ estado: "Vendido", vendedor_id: venda.vendedor_id, venda_id: vendaRow?.id ?? null })
-            .eq("chassi", scooter.chassi)
-            .neq("estado", "Vendido");
-        }
+        });
       }
 
       // 3. Gera os 3 documentos (Contrato de Compra e Venda + 2 Termos) a partir

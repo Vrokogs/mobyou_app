@@ -92,6 +92,8 @@ export type ManutencaoPreventiva = {
   numero: number;
   data_prevista: string;
   gratuita: boolean;
+  obrigatoria: boolean;
+  valor: number;
   status: string;
   realizada_em: string | null;
   ordem_id: string | null;

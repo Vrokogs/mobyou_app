@@ -149,9 +149,9 @@ export const GARANTIA_MODALIDADE_LABEL: Record<string, string> = {
   '3_meses': '3 meses',
 };
 
-// Manutenção preventiva a cada 60 dias; horizonte padrão de 1 ano (6 preventivas)
+// Manutenção preventiva/revisão a cada 60 dias
 export const PREVENTIVA_INTERVALO_DIAS = 60;
-export const PREVENTIVA_QTD_PADRAO = 6;
+export const PREVENTIVA_VALOR = 300; // R$ 300 por revisão (1ª grátis)
 
 export const PREVENTIVA_STATUS: Record<string, string> = {
   pendente: 'Pendente',
@@ -159,19 +159,52 @@ export const PREVENTIVA_STATUS: Record<string, string> = {
   cancelada: 'Cancelada',
 };
 
-// Gera a agenda de preventivas (datas a cada 60 dias a partir de dataInicioISO)
-export function gerarDatasPreventivas(
+// Quantas preventivas gerar por modalidade (a cada 60 dias dentro do período)
+// 3 meses: 1 revisão sugestiva (dentro dos 90 dias)
+// 6 meses: 3 revisões obrigatórias  |  1 ano: 6 revisões obrigatórias
+const PREVENTIVA_QTD_POR_MODALIDADE: Record<string, number> = {
+  '3_meses': 1,
+  '6_meses': 3,
+  '1_ano': 6,
+};
+
+// Para 6 meses e 1 ano a revisão é obrigatória para manter a garantia.
+// Para 3 meses é sugestiva.
+export function preventivaObrigatoria(modalidade: string | null | undefined): boolean {
+  return modalidade === '6_meses' || modalidade === '1_ano';
+}
+
+export interface PreventivaGerada {
+  numero: number;
+  data_prevista: string;
+  gratuita: boolean;
+  obrigatoria: boolean;
+  valor: number;
+}
+
+// Gera a agenda de revisões conforme a modalidade da garantia.
+export function gerarPreventivas(
   dataInicioISO: string,
-  qtd: number = PREVENTIVA_QTD_PADRAO,
-): string[] {
+  modalidade: string,
+  primeiraGratuita: boolean,
+): PreventivaGerada[] {
+  const qtd = PREVENTIVA_QTD_POR_MODALIDADE[modalidade] ?? 6;
+  const obrigatoria = preventivaObrigatoria(modalidade);
   const base = new Date(dataInicioISO + 'T12:00:00');
-  const datas: string[] = [];
+  const out: PreventivaGerada[] = [];
   for (let i = 1; i <= qtd; i++) {
     const d = new Date(base);
     d.setDate(d.getDate() + PREVENTIVA_INTERVALO_DIAS * i);
-    datas.push(d.toISOString().slice(0, 10));
+    const gratuita = i === 1 && primeiraGratuita;
+    out.push({
+      numero: i,
+      data_prevista: d.toISOString().slice(0, 10),
+      gratuita,
+      obrigatoria,
+      valor: gratuita ? 0 : PREVENTIVA_VALOR,
+    });
   }
-  return datas;
+  return out;
 }
 
 export const CONTRATO_TIPOS: Record<ContratoTipo, string> = {

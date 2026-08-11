@@ -65,7 +65,6 @@ const gestorNav: NavGroup[] = [
   {
     label: "Gestão",
     items: [
-      { title: "Estoque", href: "/gestor/estoque", icon: Package },
       { title: "Vendas", href: "/gestor/vendas", icon: ShoppingCart },
       { title: "Peças", href: "/gestor/pecas", icon: Boxes },
       { title: "Ranking", href: "/gestor/ranking", icon: Trophy },
@@ -84,7 +83,6 @@ const vendedorNav: NavGroup[] = [
     items: [
       { title: "Dashboard", href: "/vendedor", icon: LayoutDashboard },
       { title: "Clientes", href: "/vendedor/clientes", icon: Users },
-      { title: "Leads", href: "/vendedor/leads", icon: Radar },
       { title: "Vendas", href: "/vendedor/vendas", icon: ShoppingCart },
       { title: "Ranking", href: "/vendedor/ranking", icon: Trophy },
     ],
@@ -99,7 +97,6 @@ const vendedorNav: NavGroup[] = [
   {
     label: "Gestão",
     items: [
-      { title: "Estoque", href: "/vendedor/estoque", icon: Package },
       { title: "Folha de Ponto", href: "/vendedor/ponto", icon: Clock },
     ],
   },

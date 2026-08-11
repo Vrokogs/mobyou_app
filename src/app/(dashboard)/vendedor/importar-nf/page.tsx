@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { NotaFiscal } from "@/types/database";
-import { UNIDADES_VENDA, GARANTIA_MODALIDADES, gerarDatasPreventivas } from "@/lib/constants";
+import { UNIDADES_VENDA, GARANTIA_MODALIDADES, gerarPreventivas } from "@/lib/constants";
 import { Checkbox } from "@/components/ui/checkbox";
 
 interface ClienteData {
@@ -422,13 +422,15 @@ export default function VendedorImportarNFPage() {
           status: "ativa",
         }).select("id").single();
 
-        const preventivas = gerarDatasPreventivas(dataInicio).map((d, i) => ({
+        const preventivas = gerarPreventivas(dataInicio, venda.modalidade, venda.primeira_gratuita).map((p) => ({
           scooter_id: scooterId,
           cliente_id: clienteId,
           garantia_id: garRow?.id ?? null,
-          numero: i + 1,
-          data_prevista: d,
-          gratuita: i === 0 && venda.primeira_gratuita,
+          numero: p.numero,
+          data_prevista: p.data_prevista,
+          gratuita: p.gratuita,
+          obrigatoria: p.obrigatoria,
+          valor: p.valor,
           status: "pendente",
         }));
         await (supabase.from("manutencoes_preventivas") as any).insert(preventivas);
@@ -451,7 +453,7 @@ export default function VendedorImportarNFPage() {
 
         const itemValor = scooter.valor ? parseFloat(scooter.valor) : 0;
         const vendedorFinal = venda.vendedor_id || user.id;
-        const { data: vendaRow } = await (supabase.from("vendas") as any).insert({
+        await (supabase.from("vendas") as any).insert({
           vendedor_id: vendedorFinal,
           cliente_id: clienteId,
           scooter_id: scooterId,
@@ -464,15 +466,7 @@ export default function VendedorImportarNFPage() {
           modelo: scooter.modelo || null,
           chassi: scooter.chassi || null,
           contrato_id: contratoId,
-        }).select("id").single();
-
-        // Conferência por chassi: casa a moto no estoque e vira Disponível -> Vendido
-        if (scooter.chassi) {
-          await (supabase.from("estoque_motos") as any)
-            .update({ estado: "Vendido", vendedor_id: vendedorFinal, venda_id: vendaRow?.id ?? null })
-            .eq("chassi", scooter.chassi)
-            .neq("estado", "Vendido");
-        }
+        });
       }
 
       toast.success("Importacao concluida!", {

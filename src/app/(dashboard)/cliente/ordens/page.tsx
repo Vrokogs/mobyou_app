@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { Plus, ChevronRight, Wrench } from "lucide-react";
+import { Plus, ChevronRight, Wrench, AlertTriangle, FileWarning } from "lucide-react";
 
 interface Ordem {
   id: string;
@@ -46,6 +46,7 @@ export default function ClienteOrdensPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ scooter_id: "", data_agendamento: "", observacoes: "" });
+  const [contratosPendentes, setContratosPendentes] = useState(0);
 
   useEffect(() => {
     load();
@@ -56,20 +57,28 @@ export default function ClienteOrdensPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const [ordensRes, scootersRes] = await Promise.all([
+    const [ordensRes, scootersRes, contratosRes] = await Promise.all([
       supabase.from("ordens_servico")
         .select("id, numero, status, created_at, scooter:scooters!ordens_servico_scooter_id_fkey(id, modelo)")
         .eq("cliente_id", user.id).order("created_at", { ascending: false }),
       supabase.from("scooters").select("id, modelo, chassi").eq("cliente_id", user.id),
+      supabase.from("contratos").select("id, status").eq("cliente_id", user.id).neq("status", "assinado"),
     ]);
 
     if (ordensRes.data) setOrdens(ordensRes.data as unknown as Ordem[]);
     if (scootersRes.data) setScooters(scootersRes.data as unknown as Scooter[]);
+    setContratosPendentes((contratosRes.data ?? []).length);
     setLoading(false);
   }
 
   async function handleSolicitar(e: React.FormEvent) {
     e.preventDefault();
+    if (contratosPendentes > 0) {
+      toast.error("Contrato pendente de assinatura", {
+        description: "Assine o contrato para poder agendar manutenções.",
+      });
+      return;
+    }
     setSaving(true);
     try {
       const supabase = createClient();
@@ -95,6 +104,21 @@ export default function ClienteOrdensPage() {
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
+      {contratosPendentes > 0 && (
+        <div className="rounded-lg border-2 border-red-300 bg-red-50 p-4 flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-semibold text-red-800 flex items-center gap-1.5">
+              <FileWarning className="h-4 w-4" /> Contrato pendente de assinatura
+            </p>
+            <p className="text-red-700 mt-0.5">
+              Você tem {contratosPendentes} contrato(s) aguardando assinatura. Enquanto não estiver
+              assinado, <strong>não é possível agendar manutenções</strong>. Vá em{" "}
+              <Link href="/cliente/documentos" className="underline font-medium">Meus Documentos</Link> para assinar.
+            </p>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Minhas Ordens</h1>
@@ -103,7 +127,7 @@ export default function ClienteOrdensPage() {
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger
             render={
-              <Button><Plus className="mr-2 h-4 w-4" />Solicitar Manutenção</Button>
+              <Button disabled={contratosPendentes > 0}><Plus className="mr-2 h-4 w-4" />Solicitar Manutenção</Button>
             }
           />
           <DialogContent>

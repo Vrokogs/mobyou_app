@@ -19,11 +19,6 @@ interface PecaItem {
   valor_unitario: number;
 }
 
-interface ServicoItem {
-  descricao: string;
-  preco: number;
-}
-
 interface OrcamentoFormProps {
   orderId: string;
   diagnosticoData?: Diagnostico | null;
@@ -54,27 +49,14 @@ export function OrcamentoForm({
       valor_unitario: i.valor_unitario,
     })) || [];
 
-  const rawServicos = existingOrcamento?.servicos as OrcamentoItem[] | null | undefined;
-  const existingServicos: ServicoItem[] =
-    rawServicos?.map((i) => ({
-      descricao: i.descricao,
-      preco: i.valor_total,
-    })) || [];
-
   const [pecas, setPecas] = useState<PecaItem[]>(
     existingPecas.length > 0
       ? existingPecas
       : [{ descricao: "", quantidade: 1, valor_unitario: 0 }]
   );
-  const [servicos, setServicos] = useState<ServicoItem[]>(
-    existingServicos.length > 0
-      ? existingServicos
-      : [{ descricao: "", preco: 0 }]
-  );
   const [maoObra, setMaoObra] = useState(
     existingOrcamento?.mao_de_obra || 0
   );
-  const [custosAdicionais, setCustosAdicionais] = useState(0);
   const [prazoEstimado, setPrazoEstimado] = useState("");
   const [observacoes, setObservacoes] = useState(
     existingOrcamento?.observacoes || ""
@@ -87,14 +69,9 @@ export function OrcamentoForm({
     [pecas]
   );
 
-  const totalServicos = useMemo(
-    () => servicos.reduce((acc, s) => acc + s.preco, 0),
-    [servicos]
-  );
-
   const total = useMemo(
-    () => totalPecas + totalServicos + maoObra + custosAdicionais,
-    [totalPecas, totalServicos, maoObra, custosAdicionais]
+    () => totalPecas + maoObra,
+    [totalPecas, maoObra]
   );
 
   const addPeca = useCallback(() => {
@@ -117,51 +94,16 @@ export function OrcamentoForm({
     []
   );
 
-  const addServico = useCallback(() => {
-    setServicos((prev) => [...prev, { descricao: "", preco: 0 }]);
-  }, []);
-
-  const removeServico = useCallback((index: number) => {
-    setServicos((prev) => prev.filter((_, i) => i !== index));
-  }, []);
-
-  const updateServico = useCallback(
-    (index: number, field: keyof ServicoItem, value: string | number) => {
-      setServicos((prev) =>
-        prev.map((s, i) => (i === index ? { ...s, [field]: value } : s))
-      );
-    },
-    []
-  );
-
   function buildOrcamentoItems(): OrcamentoItem[] {
-    const items: OrcamentoItem[] = [];
-
-    pecas
+    return pecas
       .filter((p) => p.descricao.trim() !== "")
-      .forEach((p) => {
-        items.push({
-          descricao: p.descricao,
-          quantidade: p.quantidade,
-          valor_unitario: p.valor_unitario,
-          valor_total: p.quantidade * p.valor_unitario,
-          tipo: "peca",
-        });
-      });
-
-    servicos
-      .filter((s) => s.descricao.trim() !== "")
-      .forEach((s) => {
-        items.push({
-          descricao: s.descricao,
-          quantidade: 1,
-          valor_unitario: s.preco,
-          valor_total: s.preco,
-          tipo: "servico",
-        });
-      });
-
-    return items;
+      .map((p) => ({
+        descricao: p.descricao,
+        quantidade: p.quantidade,
+        valor_unitario: p.valor_unitario,
+        valor_total: p.quantidade * p.valor_unitario,
+        tipo: "peca" as const,
+      }));
   }
 
   async function handleSave() {
@@ -169,18 +111,15 @@ export function OrcamentoForm({
     try {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
-      const items = buildOrcamentoItems();
-
-      const pecasItems = items.filter((i) => i.tipo === "peca");
-      const servicosItems = items.filter((i) => i.tipo === "servico");
+      const pecasItems = buildOrcamentoItems();
 
       const orcamentoData = {
         ordem_id: orderId,
         criado_por: user?.id,
         pecas: pecasItems,
-        servicos: servicosItems,
+        servicos: [],
         mao_de_obra: maoObra,
-        custos_adicionais: custosAdicionais,
+        custos_adicionais: 0,
         prazo_estimado: prazoEstimado || null,
         valor_total: total,
         status: "rascunho" as const,
@@ -341,83 +280,8 @@ export function OrcamentoForm({
 
       <Separator />
 
-      {/* Servicos */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="text-sm font-semibold">Servicos</h4>
-          <Button variant="outline" size="xs" onClick={addServico}>
-            <Plus className="h-3 w-3 mr-1" />
-            Adicionar
-          </Button>
-        </div>
-
-        <div className="space-y-2">
-          <div className="hidden sm:grid grid-cols-12 gap-2 px-1">
-            <div className="col-span-8 text-xs text-muted-foreground font-medium">
-              Descricao
-            </div>
-            <div className="col-span-3 text-xs text-muted-foreground font-medium text-right">
-              Preco
-            </div>
-            <div className="col-span-1" />
-          </div>
-
-          {servicos.map((servico, index) => (
-            <div
-              key={index}
-              className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center rounded-lg border p-2"
-            >
-              <div className="sm:col-span-8">
-                <Input
-                  placeholder="Descricao do servico"
-                  value={servico.descricao}
-                  onChange={(e) =>
-                    updateServico(index, "descricao", e.target.value)
-                  }
-                  className="text-sm h-8"
-                />
-              </div>
-              <div className="sm:col-span-3">
-                <Input
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  value={servico.preco}
-                  onChange={(e) =>
-                    updateServico(
-                      index,
-                      "preco",
-                      parseFloat(e.target.value) || 0
-                    )
-                  }
-                  className="text-sm h-8"
-                />
-              </div>
-              <div className="sm:col-span-1 flex justify-end">
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  onClick={() => removeServico(index)}
-                  disabled={servicos.length === 1}
-                >
-                  <Trash2 className="h-3 w-3 text-destructive" />
-                </Button>
-              </div>
-            </div>
-          ))}
-
-          <div className="flex justify-end pr-1">
-            <span className="text-sm font-semibold">
-              Subtotal Servicos: {formatCurrency(totalServicos)}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <Separator />
-
-      {/* Mao de Obra e Custos Adicionais */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Mao de Obra e Prazo */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <Label className="text-sm font-medium">Mao de Obra (R$)</Label>
           <Input
@@ -426,19 +290,6 @@ export function OrcamentoForm({
             step={0.01}
             value={maoObra}
             onChange={(e) => setMaoObra(parseFloat(e.target.value) || 0)}
-            className="mt-1"
-          />
-        </div>
-        <div>
-          <Label className="text-sm font-medium">Custos Adicionais (R$)</Label>
-          <Input
-            type="number"
-            min={0}
-            step={0.01}
-            value={custosAdicionais}
-            onChange={(e) =>
-              setCustosAdicionais(parseFloat(e.target.value) || 0)
-            }
             className="mt-1"
           />
         </div>
@@ -475,19 +326,9 @@ export function OrcamentoForm({
             <span>{formatCurrency(totalPecas)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Servicos</span>
-            <span>{formatCurrency(totalServicos)}</span>
-          </div>
-          <div className="flex justify-between">
             <span className="text-muted-foreground">Mao de Obra</span>
             <span>{formatCurrency(maoObra)}</span>
           </div>
-          {custosAdicionais > 0 && (
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Custos Adicionais</span>
-              <span>{formatCurrency(custosAdicionais)}</span>
-            </div>
-          )}
           <Separator className="my-2" />
           <div className="flex justify-between text-base font-bold">
             <span>Total</span>

@@ -47,30 +47,16 @@ export const ORDER_STATUS_COLORS: Record<OrdemServicoStatus, string> = {
 };
 
 export const CHECKIN_ITEMS = [
-  { value: 'freio_dianteiro', label: 'Freio Dianteiro' },
-  { value: 'freio_traseiro', label: 'Freio Traseiro' },
-  { value: 'pneu_dianteiro', label: 'Pneu Dianteiro' },
-  { value: 'pneu_traseiro', label: 'Pneu Traseiro' },
-  { value: 'suspensao_dianteira', label: 'Suspensao Dianteira' },
-  { value: 'suspensao_traseira', label: 'Suspensao Traseira' },
+  { value: 'lataria_pintura_carenagem', label: 'Lataria, pintura e carenagem' },
+  { value: 'pneu', label: 'Pneu' },
   { value: 'farol', label: 'Farol' },
-  { value: 'lanterna', label: 'Lanterna' },
-  { value: 'seta_dianteira', label: 'Seta Dianteira' },
-  { value: 'seta_traseira', label: 'Seta Traseira' },
-  { value: 'painel', label: 'Painel' },
-  { value: 'acelerador', label: 'Acelerador' },
-  { value: 'bateria', label: 'Bateria' },
-  { value: 'carregador', label: 'Carregador' },
-  { value: 'motor', label: 'Motor' },
-  { value: 'controlador', label: 'Controlador' },
-  { value: 'carenagem', label: 'Carenagem' },
-  { value: 'retrovisores', label: 'Retrovisores' },
-  { value: 'buzina', label: 'Buzina' },
-  { value: 'chave', label: 'Chave' },
-  { value: 'banco', label: 'Banco' },
-  { value: 'bagageiro', label: 'Bagageiro' },
+  { value: 'setagem', label: 'Setagem' },
+  { value: 'retrovisor', label: 'Retrovisor' },
+  { value: 'pezinho', label: 'Pezinho' },
   { value: 'cavalete', label: 'Cavalete' },
-  { value: 'pedais', label: 'Pedais' },
+  { value: 'buzina', label: 'Buzina' },
+  { value: 'chave_nfc', label: 'Chave / NFC' },
+  { value: 'freios', label: 'Freios' },
 ] as const;
 
 export const CHECKIN_CLASSIFICATIONS = [

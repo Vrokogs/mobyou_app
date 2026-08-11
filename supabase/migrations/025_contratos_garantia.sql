@@ -6,13 +6,11 @@
 
 ALTER TABLE modelos_contrato ADD COLUMN IF NOT EXISTS modalidade TEXT;
 
--- Desativa o modelo genérico antigo de compra e venda (sem modalidade)
 UPDATE modelos_contrato SET ativo = false WHERE tipo = 'compra_venda' AND modalidade IS NULL;
 
--- Remove versões anteriores destes modelos por modalidade (reexecução segura)
 DELETE FROM modelos_contrato WHERE tipo = 'compra_venda' AND modalidade IN ('3_meses','6_meses','1_ano');
 
-INSERT INTO modelos_contrato (tipo, modalidade, titulo, conteudo_template, ativo) VALUES
+INSERT INTO modelos_contrato (tipo, modalidade, titulo, conteudo_template, criado_por, ativo) VALUES
 ('compra_venda', '3_meses', 'Contrato de Compra e Venda de Moto Elétrica', 'CONTRATO DE COMPRA E VENDA DE MOTO ELÉTRICA
 Pelo presente instrumento particular de Contrato de Compra e Venda, as partes a seguir qualificadas, de um lado:
 VENDEDORA – N&C MOBILIDADE ELÉTRICA LTDA, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 54.898.852/0001-77, com sede na Rua Wenceslau Bras, 37, Pontal da Cruz, São Sebastião – SP, CEP 11.606-127, neste ato representada na forma de seus atos constitutivos, doravante denominada simplesmente VENDEDORA.
@@ -94,7 +92,7 @@ CPF: _______________________________________________
 TESTEMUNHA 2:
 NOME: ______________________________________________
 CPF: _______________________________________________
-', true),
+', (SELECT id FROM profiles WHERE role = 'gestor' ORDER BY created_at LIMIT 1), true),
 ('compra_venda', '6_meses', 'Contrato de Compra e Venda de Moto Elétrica', 'CONTRATO DE COMPRA E VENDA DE MOTO ELÉTRICA
 Pelo presente instrumento particular de Contrato de Compra e Venda, as partes a seguir qualificadas, de um lado:
 VENDEDORA – N&C MOBILIDADE ELÉTRICA LTDA, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 54.898.852/0001-77, com sede na Rua Wenceslau Bras, 37, Pontal da Cruz, São Sebastião – SP, CEP 11.606-127, neste ato representada na forma de seus atos constitutivos, doravante denominada simplesmente VENDEDORA.
@@ -181,7 +179,7 @@ CPF: _______________________________________________
 TESTEMUNHA 2:
 NOME: ______________________________________________
 CPF: _______________________________________________
-', true),
+', (SELECT id FROM profiles WHERE role = 'gestor' ORDER BY created_at LIMIT 1), true),
 ('compra_venda', '1_ano', 'Contrato de Compra e Venda de Moto Elétrica', 'CONTRATO DE COMPRA E VENDA DE MOTO ELÉTRICA
 Pelo presente instrumento particular de Contrato de Compra e Venda, as partes a seguir qualificadas, de um lado:
 VENDEDORA – N&C MOBILIDADE ELÉTRICA LTDA, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 54.898.852/0001-77, com sede na Rua Wenceslau Bras, 37, Pontal da Cruz, São Sebastião – SP, CEP 11.606-127, neste ato representada na forma de seus atos constitutivos, doravante denominada simplesmente VENDEDORA.
@@ -270,4 +268,4 @@ CPF: _______________________________________________
 TESTEMUNHA 2:
 NOME: ______________________________________________
 CPF: _______________________________________________
-', true);
+', (SELECT id FROM profiles WHERE role = 'gestor' ORDER BY created_at LIMIT 1), true);

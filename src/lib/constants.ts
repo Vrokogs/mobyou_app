@@ -309,7 +309,7 @@ export const VALOR_HORA_MONTAGEM = 250;
 
 // Vendedores que também executam a etapa de manutenção (acesso ao sistema de OS).
 // E-mails em minúsculo. Amplie esta lista para liberar OS a outros vendedores.
-export const VENDEDORES_MANUTENCAO = ['julia@mobyou.com'];
+export const VENDEDORES_MANUTENCAO = ['julia@mobyou.com', 'robert@mobyou.com'];
 
 export function podeManutencao(email?: string | null): boolean {
   return !!email && VENDEDORES_MANUTENCAO.includes(email.toLowerCase());

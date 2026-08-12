@@ -32,11 +32,16 @@ const processa = (txt) => txt
 await a.from("modelos_contrato").update({ ativo: false }).eq("tipo", "compra_venda").is("modalidade", null);
 await a.from("modelos_contrato").delete().eq("tipo", "compra_venda").in("modalidade", ["3_meses", "6_meses", "1_ano"]);
 
+const titulos = {
+  "3_meses": "Contrato de Compra e Venda — Garantia de 3 meses",
+  "6_meses": "Contrato de Compra e Venda — Garantia de 6 meses",
+  "1_ano": "Contrato de Compra e Venda — Garantia de 1 ano",
+};
 for (const key of ["3_meses", "6_meses", "1_ano"]) {
   const raw = fs.readFileSync(`${SC}/contrato_${key}.txt`, "utf8");
   const { error } = await a.from("modelos_contrato").insert({
     tipo: "compra_venda", modalidade: key,
-    titulo: "Contrato de Compra e Venda de Moto Elétrica",
+    titulo: titulos[key],
     conteudo_template: processa(raw), criado_por: criadoPor, ativo: true,
   });
   console.log(`  ${key}: ${error ? "ERRO " + error.message : "OK"}`);

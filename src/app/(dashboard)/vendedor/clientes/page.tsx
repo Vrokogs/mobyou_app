@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { Plus, Search, Eye, Upload, FileText } from "lucide-react";
+import { Plus, Search, Eye, Upload, FileText, Trash2, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 interface Cliente {
@@ -55,6 +55,27 @@ export default function VendedorClientesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ nome: "", cpf: "", telefone: "", email: "", endereco: "" });
+  const [deletingId, setDeletingId] = useState<string>("");
+
+  async function excluirCliente(cliente: Cliente) {
+    if (!confirm(`Excluir o cliente "${cliente.nome}" e TODOS os dados vinculados (scooters, vendas, OS, contratos, garantias)? Esta ação é irreversível.`)) return;
+    setDeletingId(cliente.id);
+    try {
+      const res = await fetch("/api/excluir-cliente", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clienteId: cliente.id }),
+      });
+      const json = await res.json();
+      if (!res.ok) { toast.error("Erro ao excluir cliente", { description: json.error || json.detalhe }); return; }
+      toast.success(`Cliente "${cliente.nome}" excluído.`);
+      loadClientes();
+    } catch {
+      toast.error("Erro inesperado ao excluir cliente");
+    } finally {
+      setDeletingId("");
+    }
+  }
 
   useEffect(() => {
     loadClientes();
@@ -270,9 +291,15 @@ export default function VendedorClientesPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Link href={`/vendedor/clientes/${cliente.id}`}>
-                        <Button variant="ghost" size="sm"><Eye className="h-4 w-4" /></Button>
-                      </Link>
+                      <div className="flex items-center gap-1">
+                        <Link href={`/vendedor/clientes/${cliente.id}`}>
+                          <Button variant="ghost" size="sm"><Eye className="h-4 w-4" /></Button>
+                        </Link>
+                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive"
+                          disabled={deletingId === cliente.id} onClick={() => excluirCliente(cliente)} title="Excluir cliente">
+                          {deletingId === cliente.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

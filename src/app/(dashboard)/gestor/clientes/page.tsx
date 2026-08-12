@@ -26,7 +26,7 @@ import {
   DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Search, Eye, Pencil, Users, Upload, FileText } from "lucide-react";
+import { Plus, Search, Eye, Pencil, Users, Upload, FileText, Trash2, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -82,6 +82,35 @@ export default function ClientesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [scooterCounts, setScooterCounts] = useState<Record<string, number>>({});
+  const [deletingId, setDeletingId] = useState<string>("");
+
+  async function excluirCliente(cliente: Profile) {
+    const n = scooterCounts[cliente.id] ?? 0;
+    if (!confirm(
+      `Excluir o cliente "${cliente.nome}" e TODOS os dados vinculados` +
+      (n > 0 ? ` (${n} scooter(s), vendas, OS, contratos, garantias)` : "") +
+      "? Esta ação é irreversível."
+    )) return;
+    setDeletingId(cliente.id);
+    try {
+      const res = await fetch("/api/excluir-cliente", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clienteId: cliente.id }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        toast.error("Erro ao excluir cliente", { description: json.error || json.detalhe });
+        return;
+      }
+      toast.success(`Cliente "${cliente.nome}" excluído.`);
+      loadClientes();
+    } catch {
+      toast.error("Erro inesperado ao excluir cliente");
+    } finally {
+      setDeletingId("");
+    }
+  }
 
   const {
     register,
@@ -412,6 +441,10 @@ export default function ClientesPage() {
                         </Button>
                         <Button variant="ghost" size="icon-sm" render={<Link href={`/gestor/clientes/${cliente.id}`} />}>
                           <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon-sm" className="text-destructive hover:text-destructive"
+                          disabled={deletingId === cliente.id} onClick={() => excluirCliente(cliente)} title="Excluir cliente">
+                          {deletingId === cliente.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                         </Button>
                       </div>
                     </TableCell>

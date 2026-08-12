@@ -93,7 +93,10 @@ export async function middleware(request: NextRequest) {
         if (prefix === '/tecnico') continue;
         if (
           prefix === '/gestor' &&
-          (pathname.startsWith('/gestor/ordens') || pathname.startsWith('/gestor/orcamentos'))
+          (pathname.startsWith('/gestor/ordens') ||
+            pathname.startsWith('/gestor/orcamentos') ||
+            pathname.startsWith('/gestor/atendimentos') ||
+            pathname.startsWith('/gestor/manutencoes'))
         ) {
           continue;
         }

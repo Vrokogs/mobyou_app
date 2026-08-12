@@ -117,6 +117,10 @@ export type OrdemServico = {
   valor_total: number | null;
   km_atual: number | null;
   foto_km: string | null;
+  local_atendimento: string | null;
+  pedido_geral: string | null;
+  contato: string | null;
+  status_atendimento: string | null;
   data_agendamento: string | null;
   data_recebimento: string | null;
   data_finalizacao: string | null;

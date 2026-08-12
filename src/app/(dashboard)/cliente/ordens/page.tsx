@@ -13,7 +13,10 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { Plus, ChevronRight, Wrench, AlertTriangle, FileWarning } from "lucide-react";
+import { Plus, ChevronRight, Wrench, AlertTriangle, FileWarning, Info, MapPin } from "lucide-react";
+import {
+  LOCAIS_ATENDIMENTO, proximasDatasLocal, horariosLocal, MENSAGEM_A_COMBINAR, TIPOS_SOLICITACAO,
+} from "@/lib/constants";
 
 interface Ordem {
   id: string;
@@ -45,8 +48,10 @@ export default function ClienteOrdensPage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ scooter_id: "", data_agendamento: "", observacoes: "" });
+  const [form, setForm] = useState({ scooter_id: "", local: "", tipo: "preventiva", data: "", hora: "", pedido: "" });
   const [contratosPendentes, setContratosPendentes] = useState(0);
+
+  const localSel = LOCAIS_ATENDIMENTO.find((l) => l.value === form.local);
 
   useEffect(() => {
     load();
@@ -79,25 +84,41 @@ export default function ClienteOrdensPage() {
       });
       return;
     }
+    if (!form.scooter_id) { toast.error("Selecione a scooter."); return; }
+    if (!form.local) { toast.error("Selecione o local de atendimento."); return; }
+
+    const aCombinar = localSel?.tipo === "a_combinar";
+    if (!aCombinar && (!form.data || !form.hora)) {
+      toast.error("Selecione a data e o horário disponíveis.");
+      return;
+    }
+
     setSaving(true);
     try {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      const dataAgendamento = aCombinar ? null : `${form.data}T${form.hora}:00`;
       const { error } = await (supabase.from("ordens_servico") as any).insert({
         scooter_id: form.scooter_id,
         cliente_id: user.id,
         status: "agendado",
-        data_agendamento: form.data_agendamento || null,
-        observacoes: form.observacoes || null,
+        tipo: form.tipo,
+        local_atendimento: form.local,
+        pedido_geral: form.pedido || null,
+        observacoes: form.pedido || null,
+        data_agendamento: dataAgendamento,
+        status_atendimento: aCombinar ? "aguardando_contato" : "novo",
       });
 
       if (error) { toast.error("Erro ao solicitar", { description: error.message }); return; }
 
-      toast.success("Manutenção solicitada!");
+      toast.success(aCombinar
+        ? "Solicitação enviada! Nosso técnico entrará em contato."
+        : "Manutenção agendada!");
       setDialogOpen(false);
-      setForm({ scooter_id: "", data_agendamento: "", observacoes: "" });
+      setForm({ scooter_id: "", local: "", tipo: "preventiva", data: "", hora: "", pedido: "" });
       load();
     } catch { toast.error("Erro inesperado"); } finally { setSaving(false); }
   }
@@ -138,20 +159,74 @@ export default function ClienteOrdensPage() {
                 <Select items={Object.fromEntries(scooters.map((s) => [s.id, `${s.modelo}${s.chassi ? ` - ${s.chassi}` : ""}`]))} value={form.scooter_id} onValueChange={v => setForm({...form, scooter_id: v ?? ""})}>
                   <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
-                    {scooters.map(s => <SelectItem key={s.id} value={s.id}>{s.modelo} - {s.chassi}</SelectItem>)}
+                    {scooters.map(s => <SelectItem key={s.id} value={s.id}>{s.modelo}{s.chassi ? ` - ${s.chassi}` : ""}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
+
               <div className="space-y-2">
-                <Label>Data Preferencial</Label>
-                <Input type="date" value={form.data_agendamento} onChange={e => setForm({...form, data_agendamento: e.target.value})} />
+                <Label>Tipo de solicitação</Label>
+                <Select items={Object.fromEntries(TIPOS_SOLICITACAO.map((t) => [t.value, t.label]))} value={form.tipo} onValueChange={v => v && setForm({...form, tipo: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {TIPOS_SOLICITACAO.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
+
               <div className="space-y-2">
-                <Label>Observações</Label>
-                <Textarea placeholder="Descreva o problema ou motivo da manutenção..." value={form.observacoes} onChange={e => setForm({...form, observacoes: e.target.value})} />
+                <Label className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> Local de atendimento</Label>
+                <Select items={Object.fromEntries(LOCAIS_ATENDIMENTO.map((l) => [l.value, l.label]))} value={form.local} onValueChange={v => setForm({...form, local: v ?? "", data: "", hora: ""})}>
+                  <SelectTrigger><SelectValue placeholder="Selecione a cidade/local" /></SelectTrigger>
+                  <SelectContent>
+                    {LOCAIS_ATENDIMENTO.map(l => <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Caraguatatuba: sem agenda */}
+              {localSel?.tipo === "a_combinar" && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 flex items-start gap-2 text-sm">
+                  <Info className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-amber-800">{MENSAGEM_A_COMBINAR}</p>
+                    <p className="text-amber-700 mt-1 font-medium">Data/Horário: A combinar</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Centro / Costa Sul: agenda Ter/Qua/Qui, 10h–17h */}
+              {localSel?.tipo === "agenda" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Data (Ter/Qua/Qui)</Label>
+                    <Select items={Object.fromEntries(proximasDatasLocal(localSel).map((d) => [d, new Date(d + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" })]))} value={form.data} onValueChange={v => setForm({...form, data: v ?? ""})}>
+                      <SelectTrigger className="w-full"><SelectValue placeholder="Escolha o dia" /></SelectTrigger>
+                      <SelectContent>
+                        {proximasDatasLocal(localSel).map((d) => (
+                          <SelectItem key={d} value={d}>{new Date(d + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" })}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Horário (10h–17h)</Label>
+                    <Select items={Object.fromEntries(horariosLocal(localSel).map((h) => [h, h]))} value={form.hora} onValueChange={v => setForm({...form, hora: v ?? ""})}>
+                      <SelectTrigger className="w-full"><SelectValue placeholder="Horário" /></SelectTrigger>
+                      <SelectContent>
+                        {horariosLocal(localSel).map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label>Pedido / problema apresentado</Label>
+                <Textarea placeholder="Descreva o problema ou o motivo da manutenção..." value={form.pedido} onChange={e => setForm({...form, pedido: e.target.value})} />
               </div>
               <Button type="submit" className="w-full" disabled={saving}>
-                {saving ? "Enviando..." : "Solicitar"}
+                {saving ? "Enviando..." : "Solicitar atendimento"}
               </Button>
             </form>
           </DialogContent>

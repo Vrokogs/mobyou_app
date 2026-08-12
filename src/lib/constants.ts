@@ -277,6 +277,88 @@ export const UNIDADE_NEGOCIO_LABEL: Record<string, string> = {
 // divididas 50/50 entre eles (regra do briefing).
 export const VENDEDORES_ATACADO = ['julia@mobyou.com', 'robert@mobyou.com'];
 
+// ---------------------------------------------------------------------------
+// Locais de atendimento (agendamento de manutenção/OS)
+//   - Caraguatatuba: sem agenda; fica "A combinar", técnico entra em contato.
+//   - Centro – São Sebastião e Costa Sul: Ter/Qua/Qui, das 10h às 17h.
+// dias: 0=Dom, 1=Seg, 2=Ter, 3=Qua, 4=Qui, 5=Sex, 6=Sáb
+// ---------------------------------------------------------------------------
+export interface LocalAtendimento {
+  value: string;
+  label: string;
+  tipo: 'a_combinar' | 'agenda';
+  dias?: number[];
+  horaInicio?: number;
+  horaFim?: number;
+}
+
+export const LOCAIS_ATENDIMENTO: LocalAtendimento[] = [
+  { value: 'caraguatatuba', label: 'Caraguatatuba', tipo: 'a_combinar' },
+  { value: 'centro_sao_sebastiao', label: 'Centro – São Sebastião', tipo: 'agenda', dias: [2, 3, 4], horaInicio: 10, horaFim: 17 },
+  { value: 'costa_sul', label: 'Costa Sul', tipo: 'agenda', dias: [2, 3, 4], horaInicio: 10, horaFim: 17 },
+];
+
+export const LOCAL_ATENDIMENTO_LABEL: Record<string, string> = Object.fromEntries(
+  LOCAIS_ATENDIMENTO.map((l) => [l.value, l.label]),
+);
+
+export const MENSAGEM_A_COMBINAR =
+  'Nosso técnico entrará em contato para combinar a melhor data e horário para o seu atendimento.';
+
+// Próximas datas permitidas (dias da semana do local), a partir de hoje
+export function proximasDatasLocal(local: LocalAtendimento, qtd = 8): string[] {
+  if (local.tipo !== 'agenda' || !local.dias) return [];
+  const datas: string[] = [];
+  const d = new Date();
+  d.setHours(12, 0, 0, 0);
+  for (let i = 0; i < 90 && datas.length < qtd; i++) {
+    const dia = new Date(d);
+    dia.setDate(d.getDate() + i);
+    if (i > 0 && local.dias.includes(dia.getDay())) {
+      datas.push(dia.toISOString().slice(0, 10));
+    }
+  }
+  return datas;
+}
+
+// Horários disponíveis (hora cheia) no intervalo do local
+export function horariosLocal(local: LocalAtendimento): string[] {
+  if (local.tipo !== 'agenda' || local.horaInicio == null || local.horaFim == null) return [];
+  const horas: string[] = [];
+  for (let h = local.horaInicio; h <= local.horaFim; h++) {
+    horas.push(`${String(h).padStart(2, '0')}:00`);
+  }
+  return horas;
+}
+
+// Status do fluxo de pós-venda
+export const STATUS_ATENDIMENTO: Record<string, string> = {
+  novo: 'Novo',
+  aguardando_contato: 'Aguardando contato',
+  agendado: 'Agendado',
+  moto_recebida: 'Moto recebida',
+  em_manutencao: 'Em manutenção',
+  finalizado: 'Finalizado',
+  entregue: 'Entregue',
+};
+
+export const STATUS_ATENDIMENTO_COR: Record<string, string> = {
+  novo: 'bg-blue-100 text-blue-800',
+  aguardando_contato: 'bg-amber-100 text-amber-800',
+  agendado: 'bg-indigo-100 text-indigo-800',
+  moto_recebida: 'bg-purple-100 text-purple-800',
+  em_manutencao: 'bg-cyan-100 text-cyan-800',
+  finalizado: 'bg-emerald-100 text-emerald-800',
+  entregue: 'bg-green-100 text-green-800',
+};
+
+// Tipos de solicitação de atendimento
+export const TIPOS_SOLICITACAO = [
+  { value: 'preventiva', label: 'Manutenção preventiva' },
+  { value: 'reparo', label: 'Reparo / problema na moto' },
+  { value: 'revisao', label: 'Revisão / avaliação' },
+] as const;
+
 // Origem do lead / da venda (de onde veio o cliente)
 export const ORIGEM_VENDA = [
   'Lead',

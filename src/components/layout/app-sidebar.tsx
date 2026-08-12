@@ -20,7 +20,7 @@ import {
   LayoutDashboard, Users, Bike, ClipboardList, FileText, Wrench,
   Package, ShieldCheck, Award, Upload, DollarSign, Settings,
   LogOut, ChevronUp, UserCog, Hash, ShoppingCart,
-  Clock, Trophy, Radar, CalendarClock, Boxes, BarChart3,
+  Clock, Trophy, Radar, CalendarClock, Boxes, BarChart3, Bell,
 } from "lucide-react";
 import { podeManutencao } from "@/lib/constants";
 
@@ -48,6 +48,7 @@ const gestorNav: NavGroup[] = [
   {
     label: "Serviços",
     items: [
+      { title: "Atendimentos", href: "/gestor/atendimentos", icon: Bell },
       { title: "Ordens de Serviço", href: "/gestor/ordens", icon: ClipboardList },
       { title: "Orçamentos", href: "/gestor/orcamentos", icon: DollarSign },
       { title: "Garantias", href: "/gestor/garantias", icon: ShieldCheck },
@@ -147,8 +148,10 @@ const navByRole: Record<string, NavGroup[]> = {
 const oficinaGroup: NavGroup = {
   label: "Oficina",
   items: [
+    { title: "Atendimentos", href: "/gestor/atendimentos", icon: Bell },
     { title: "Ordens de Serviço", href: "/gestor/ordens", icon: ClipboardList },
     { title: "Orçamentos", href: "/gestor/orcamentos", icon: DollarSign },
+    { title: "Manutenções", href: "/gestor/manutencoes", icon: CalendarClock },
     { title: "Minhas OS", href: "/tecnico/ordens", icon: Wrench },
   ],
 };

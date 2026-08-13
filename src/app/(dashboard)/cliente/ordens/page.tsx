@@ -175,13 +175,30 @@ export default function ClienteOrdensPage() {
               </div>
 
               <div className="space-y-2">
-                <Label className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> Local de atendimento</Label>
+                <Label className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> Local de atendimento (escolha o mais perto)</Label>
                 <Select items={Object.fromEntries(LOCAIS_ATENDIMENTO.map((l) => [l.value, l.label]))} value={form.local} onValueChange={v => setForm({...form, local: v ?? "", data: "", hora: ""})}>
                   <SelectTrigger><SelectValue placeholder="Selecione a cidade/local" /></SelectTrigger>
                   <SelectContent>
-                    {LOCAIS_ATENDIMENTO.map(l => <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>)}
+                    {LOCAIS_ATENDIMENTO.map(l => (
+                      <SelectItem key={l.value} value={l.value}>
+                        <div className="flex flex-col">
+                          <span>{l.label}</span>
+                          <span className="text-[11px] text-muted-foreground">{l.endereco}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+                {localSel && (
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(localSel.endereco)}`}
+                    target="_blank" rel="noopener noreferrer"
+                    className="flex items-start gap-1.5 rounded-md border bg-muted/40 px-3 py-2 text-xs hover:bg-muted"
+                  >
+                    <MapPin className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+                    <span>{localSel.endereco} <span className="text-primary underline">(ver no mapa)</span></span>
+                  </a>
+                )}
               </div>
 
               {/* Caraguatatuba: sem agenda */}

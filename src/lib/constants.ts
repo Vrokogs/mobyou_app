@@ -286,6 +286,7 @@ export const VENDEDORES_ATACADO = ['julia@mobyou.com', 'robert@mobyou.com'];
 export interface LocalAtendimento {
   value: string;
   label: string;
+  endereco: string;
   tipo: 'a_combinar' | 'agenda';
   dias?: number[];
   horaInicio?: number;
@@ -293,10 +294,29 @@ export interface LocalAtendimento {
 }
 
 export const LOCAIS_ATENDIMENTO: LocalAtendimento[] = [
-  { value: 'caraguatatuba', label: 'Caraguatatuba', tipo: 'a_combinar' },
-  { value: 'centro_sao_sebastiao', label: 'Centro – São Sebastião', tipo: 'agenda', dias: [2, 3, 4], horaInicio: 10, horaFim: 17 },
-  { value: 'costa_sul', label: 'Costa Sul', tipo: 'agenda', dias: [2, 3, 4], horaInicio: 10, horaFim: 17 },
+  {
+    value: 'caraguatatuba',
+    label: 'Caraguatatuba',
+    endereco: 'Av. Mal. Floriano Peixoto, 134 - Poiares, Caraguatatuba - SP, 11673-000',
+    tipo: 'a_combinar',
+  },
+  {
+    value: 'centro_sao_sebastiao',
+    label: 'Centro – São Sebastião',
+    endereco: 'R. Wenceslau Bráz - São Sebastião, SP, 11606-127',
+    tipo: 'agenda', dias: [2, 3, 4], horaInicio: 10, horaFim: 17,
+  },
+  {
+    value: 'costa_sul',
+    label: 'Costa Sul',
+    endereco: 'R. Manoel Francisco Ferro, 21, loja 07. Galeria Villa Di Cattanzaro. Praia de Boiçucanga, São Sebastião - SP, 11600-000',
+    tipo: 'agenda', dias: [2, 3, 4], horaInicio: 10, horaFim: 17,
+  },
 ];
+
+export const LOCAL_ATENDIMENTO_ENDERECO: Record<string, string> = Object.fromEntries(
+  LOCAIS_ATENDIMENTO.map((l) => [l.value, l.endereco]),
+);
 
 export const LOCAL_ATENDIMENTO_LABEL: Record<string, string> = Object.fromEntries(
   LOCAIS_ATENDIMENTO.map((l) => [l.value, l.label]),

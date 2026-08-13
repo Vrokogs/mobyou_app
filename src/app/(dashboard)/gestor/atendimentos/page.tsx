@@ -12,8 +12,8 @@ import {
 import { toast } from "sonner";
 import { Bell, MapPin, Copy, Phone, Bike, Clock, Star } from "lucide-react";
 import {
-  LOCAIS_ATENDIMENTO, LOCAL_ATENDIMENTO_LABEL, STATUS_ATENDIMENTO, STATUS_ATENDIMENTO_COR,
-  TIPOS_SOLICITACAO,
+  LOCAIS_ATENDIMENTO, LOCAL_ATENDIMENTO_LABEL, LOCAL_ATENDIMENTO_ENDERECO,
+  STATUS_ATENDIMENTO, STATUS_ATENDIMENTO_COR, TIPOS_SOLICITACAO,
 } from "@/lib/constants";
 
 interface Atendimento {
@@ -50,6 +50,7 @@ function textoParaTecnico(a: Atendimento): string {
     `Solicitação: ${tipoLabel(a.tipo)}`,
     `Data/Horário: ${dataHora(a)}`,
     `Local: ${LOCAL_ATENDIMENTO_LABEL[a.local_atendimento ?? ""] ?? "—"}`,
+    `Endereço: ${LOCAL_ATENDIMENTO_ENDERECO[a.local_atendimento ?? ""] ?? "—"}`,
     "",
     "Pedido geral do cliente:",
     a.pedido_geral || a.observacoes || "—",
@@ -128,6 +129,7 @@ export default function GestorAtendimentosPage() {
           <p className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-muted-foreground" /> {LOCAL_ATENDIMENTO_LABEL[a.local_atendimento ?? ""] ?? "—"}</p>
           <p className={`flex items-center gap-1.5 ${isCaragua ? "text-amber-700 font-medium" : ""}`}><Clock className="h-3.5 w-3.5 text-muted-foreground" /> {dataHora(a)}</p>
         </div>
+        <p className="text-xs text-muted-foreground">{LOCAL_ATENDIMENTO_ENDERECO[a.local_atendimento ?? ""] ?? ""}</p>
 
         <p className="text-sm"><span className="text-muted-foreground">Solicitação:</span> {tipoLabel(a.tipo)}</p>
         {(a.pedido_geral || a.observacoes) && (

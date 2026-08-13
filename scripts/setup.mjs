@@ -1,5 +1,13 @@
-const SUPABASE_URL = "https://gshikzdnvrlhqdqlplxg.supabase.co";
-const SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdzaGlremRudnJsaHFkcWxwbHhnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDY4MzUyMSwiZXhwIjoyMDk2MjU5NTIxfQ.UE9vT8SGXs69ILUO-vNyFE604c9sOo-oNErsbi4_4lY";
+import { readFileSync } from "node:fs";
+// Lê as credenciais do .env.local (nunca hardcode chaves no código).
+const env = readFileSync(".env.local", "utf8");
+const getEnv = (k) => (env.match(new RegExp("^" + k + "=(.*)", "m")) || [])[1]?.trim();
+const SUPABASE_URL = getEnv("NEXT_PUBLIC_SUPABASE_URL");
+const SERVICE_KEY = getEnv("SUPABASE_SERVICE_ROLE_KEY");
+if (!SUPABASE_URL || !SERVICE_KEY) {
+  console.error("Faltam NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY no .env.local");
+  process.exit(1);
+}
 
 const users = [
   { email: "gestor@mobyou.com", password: "Mobyou@2024", nome: "Admin Gestor", role: "gestor", cpf: "111.111.111-11", telefone: "(12) 99999-0001" },

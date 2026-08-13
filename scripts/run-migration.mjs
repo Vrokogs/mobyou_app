@@ -1,12 +1,24 @@
 import pg from 'pg';
 import { readFileSync } from 'fs';
 
+// Credenciais vêm do .env.local / variáveis de ambiente — nunca hardcode.
+const env = readFileSync('.env.local', 'utf8');
+const getEnv = (k) => (env.match(new RegExp('^' + k + '=(.*)', 'm')) || [])[1]?.trim() || process.env[k];
+const SUPABASE_URL = getEnv('NEXT_PUBLIC_SUPABASE_URL');
+const SERVICE_KEY = getEnv('SUPABASE_SERVICE_ROLE_KEY');
+const DB_HOST = getEnv('SUPABASE_DB_HOST');
+const DB_PASSWORD = getEnv('SUPABASE_DB_PASSWORD');
+if (!DB_HOST || !DB_PASSWORD) {
+  console.error('Defina SUPABASE_DB_HOST e SUPABASE_DB_PASSWORD no .env.local para rodar migrations.');
+  process.exit(1);
+}
+
 const client = new pg.Client({
-  host: 'db.gshikzdnvrlhqdqlplxg.supabase.co',
+  host: DB_HOST,
   port: 5432,
   database: 'postgres',
   user: 'postgres',
-  password: 'MIKbVmHRJ1YYXxeo',
+  password: DB_PASSWORD,
   ssl: { rejectUnauthorized: false },
 });
 
@@ -92,9 +104,7 @@ async function run() {
   // Now create profiles for existing auth users
   console.log('\n--- Creating profiles for test users ---');
 
-  const SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdzaGlremRudnJsaHFkcWxwbHhnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDY4MzUyMSwiZXhwIjoyMDk2MjU5NTIxfQ.UE9vT8SGXs69ILUO-vNyFE604c9sOo-oNErsbi4_4lY";
-
-  const usersRes = await fetch('https://gshikzdnvrlhqdqlplxg.supabase.co/auth/v1/admin/users?page=1&per_page=50', {
+  const usersRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users?page=1&per_page=50`, {
     headers: { 'Authorization': `Bearer ${SERVICE_KEY}`, 'apikey': SERVICE_KEY },
   });
   const usersData = await usersRes.json();

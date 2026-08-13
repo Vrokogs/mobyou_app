@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { extractText, getDocumentProxy } from "unpdf";
 import { MOBYOU_MODELOS } from "@/lib/constants";
+import { createClient as createServer } from "@/lib/supabase/server";
+import { checkRate } from "@/lib/rate-limit";
 
 const CORES = [
   "PRETA", "PRETO", "BRANCA", "BRANCO", "AZUL", "VERMELHA", "VERMELHO",
@@ -10,6 +12,18 @@ const CORES = [
 // Extrai texto de um DANFE (PDF) e tenta garimpar os campos principais.
 // Melhor-esforço: o layout da DANFE varia entre emissores. O XML é 100%.
 export async function POST(req: Request) {
+  // Rate limit + exige staff autenticado (extração consome CPU)
+  const rl = checkRate(req, "extrair-nf", 15);
+  if (rl) return NextResponse.json({ error: "Muitas requisições. Aguarde." }, { status: 429, headers: { "Retry-After": String(rl.retryAfter) } });
+  const supabase = await createServer();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  const { data: perfil } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+  const role = (perfil as { role?: string } | null)?.role;
+  if (role !== "gestor" && role !== "vendedor") {
+    return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
+  }
+
   try {
     const form = await req.formData();
     const file = form.get("file");

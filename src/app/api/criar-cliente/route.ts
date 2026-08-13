@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import { createClient as createServer } from "@/lib/supabase/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
+import { checkRate } from "@/lib/rate-limit";
 
 // Cria a conta de acesso (auth) + perfil do cliente. Usa service-role no servidor.
 export async function POST(req: Request) {
+  const rl = checkRate(req, "criar-cliente", 20);
+  if (rl) return NextResponse.json({ error: "Muitas requisições. Aguarde." }, { status: 429, headers: { "Retry-After": String(rl.retryAfter) } });
+
   let body: {
     nome?: string;
     cpf?: string;

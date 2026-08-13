@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createHash } from "node:crypto";
 import { createClient as createServer } from "@/lib/supabase/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
+import { checkRate } from "@/lib/rate-limit";
 
 function parseUA(ua: string) {
   let so = "Desconhecido";
@@ -22,6 +23,9 @@ function parseUA(ua: string) {
 }
 
 export async function POST(req: Request) {
+  const rl = checkRate(req, "assinar", 30);
+  if (rl) return NextResponse.json({ error: "Muitas requisições. Aguarde." }, { status: 429, headers: { "Retry-After": String(rl.retryAfter) } });
+
   let body: {
     contrato_id?: string;
     assinatura_imagem?: string;

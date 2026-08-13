@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { createClient as createServer } from "@/lib/supabase/server";
 import { createClient as createAdmin } from "@supabase/supabase-js";
+import { checkRate } from "@/lib/rate-limit";
 
 // Exclui um cliente e TODOS os dados vinculados a ele (scooters, vendas, OS,
 // contratos, garantias, manutenções, NF). Usa service-role no servidor.
 // Permitido a gestor e vendedor.
 export async function POST(req: Request) {
+  const rl = checkRate(req, "excluir-cliente", 10);
+  if (rl) return NextResponse.json({ error: "Muitas requisições. Aguarde." }, { status: 429, headers: { "Retry-After": String(rl.retryAfter) } });
+
   let body: { clienteId?: string };
   try {
     body = await req.json();

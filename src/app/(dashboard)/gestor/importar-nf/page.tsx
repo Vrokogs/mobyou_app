@@ -389,7 +389,7 @@ export default function ImportarNFPage() {
         }).select("id").single();
 
         // Agenda das revisões conforme a modalidade (3m=sugestiva; 6m/1a=obrigatória)
-        const preventivas = gerarPreventivas(dataInicio, venda.modalidade, venda.primeira_gratuita).map((p) => ({
+        const preventivas = gerarPreventivas(dataInicio, venda.modalidade, venda.primeira_gratuita, scooter.modelo).map((p) => ({
           scooter_id: scooterId,
           cliente_id: clienteId,
           garantia_id: garRow?.id ?? null,

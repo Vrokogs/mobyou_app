@@ -431,7 +431,7 @@ export default function VendedorImportarNFPage() {
           status: "ativa",
         }).select("id").single();
 
-        const preventivas = gerarPreventivas(dataInicio, venda.modalidade, venda.primeira_gratuita).map((p) => ({
+        const preventivas = gerarPreventivas(dataInicio, venda.modalidade, venda.primeira_gratuita, scooter.modelo).map((p) => ({
           scooter_id: scooterId,
           cliente_id: clienteId,
           garantia_id: garRow?.id ?? null,

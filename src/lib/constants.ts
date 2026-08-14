@@ -135,9 +135,9 @@ export const GARANTIA_MODALIDADE_LABEL: Record<string, string> = {
   '3_meses': '3 meses',
 };
 
-// Manutenção preventiva/revisão a cada 60 dias
-export const PREVENTIVA_INTERVALO_DIAS = 60;
-export const PREVENTIVA_VALOR = 300; // R$ 300 por revisão (1ª grátis)
+// Manutenção preventiva/revisão a cada 90 dias (3 em 3 meses)
+export const PREVENTIVA_INTERVALO_DIAS = 90;
+export const PREVENTIVA_VALOR = 300; // R$ 300 por revisão (1ª grátis, exceto Bibi)
 
 export const PREVENTIVA_STATUS: Record<string, string> = {
   pendente: 'Pendente',
@@ -145,18 +145,26 @@ export const PREVENTIVA_STATUS: Record<string, string> = {
   cancelada: 'Cancelada',
 };
 
-// Quantas preventivas gerar por modalidade (a cada 60 dias dentro do período)
-// 3 meses: 1 revisão sugestiva (dentro dos 90 dias)
-// 6 meses: 3 revisões obrigatórias  |  1 ano: 6 revisões obrigatórias
+// Quantas preventivas gerar por modalidade (a cada 90 dias dentro do período)
+// 3 meses: 1 revisão sugestiva  |  6 meses: 2 revisões  |  1 ano: 4 revisões
 const PREVENTIVA_QTD_POR_MODALIDADE: Record<string, number> = {
   '3_meses': 1,
-  '6_meses': 3,
-  '1_ano': 6,
+  '6_meses': 2,
+  '1_ano': 4,
 };
 
+// Modelo Bibi: todas as preventivas são PAGAS e a revisão é sugestiva (dentro de 90 dias).
+export function isModeloBibi(modelo: string | null | undefined): boolean {
+  return !!modelo && modelo.toLowerCase().includes('bibi');
+}
+
 // Para 6 meses e 1 ano a revisão é obrigatória para manter a garantia.
-// Para 3 meses é sugestiva.
-export function preventivaObrigatoria(modalidade: string | null | undefined): boolean {
+// Para 3 meses é sugestiva. O modelo Bibi é sempre sugestivo.
+export function preventivaObrigatoria(
+  modalidade: string | null | undefined,
+  modelo?: string | null,
+): boolean {
+  if (isModeloBibi(modelo)) return false;
   return modalidade === '6_meses' || modalidade === '1_ano';
 }
 
@@ -169,19 +177,23 @@ export interface PreventivaGerada {
 }
 
 // Gera a agenda de revisões conforme a modalidade da garantia.
+// modelo (opcional): quando for "Bibi", todas as revisões são pagas e sugestivas.
 export function gerarPreventivas(
   dataInicioISO: string,
   modalidade: string,
   primeiraGratuita: boolean,
+  modelo?: string | null,
 ): PreventivaGerada[] {
-  const qtd = PREVENTIVA_QTD_POR_MODALIDADE[modalidade] ?? 6;
-  const obrigatoria = preventivaObrigatoria(modalidade);
+  const bibi = isModeloBibi(modelo);
+  const qtd = PREVENTIVA_QTD_POR_MODALIDADE[modalidade] ?? 4;
+  const obrigatoria = preventivaObrigatoria(modalidade, modelo);
   const base = new Date(dataInicioISO + 'T12:00:00');
   const out: PreventivaGerada[] = [];
   for (let i = 1; i <= qtd; i++) {
     const d = new Date(base);
     d.setDate(d.getDate() + PREVENTIVA_INTERVALO_DIAS * i);
-    const gratuita = i === 1 && primeiraGratuita;
+    // Bibi nunca tem revisão gratuita; nos demais, a 1ª pode ser gratuita.
+    const gratuita = !bibi && i === 1 && primeiraGratuita;
     out.push({
       numero: i,
       data_prevista: d.toISOString().slice(0, 10),

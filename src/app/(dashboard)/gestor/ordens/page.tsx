@@ -45,7 +45,6 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { DateTimePicker } from "@/components/ui/datetime-picker";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -54,6 +53,8 @@ import {
   LOCAIS_ATENDIMENTO,
   MENSAGEM_A_COMBINAR,
   TIPOS_SOLICITACAO,
+  proximasDatasLocal,
+  horariosLocal,
 } from "@/lib/constants";
 import type {
   OrdemServico,
@@ -109,7 +110,8 @@ export default function OrdensPage() {
     scooter_id: "",
     tipo: "preventiva",
     local: "",
-    data_agendamento: "",
+    data: "",
+    hora: "",
     observacoes: "",
   });
   const [creating, setCreating] = useState(false);
@@ -207,7 +209,7 @@ export default function OrdensPage() {
   }
 
   function handleOpenDialog() {
-    setNewOS({ cliente_id: "", scooter_id: "", tipo: "preventiva", local: "", data_agendamento: "", observacoes: "" });
+    setNewOS({ cliente_id: "", scooter_id: "", tipo: "preventiva", local: "", data: "", hora: "", observacoes: "" });
     setScootersCliente([]);
     loadClientes();
     setDialogOpen(true);
@@ -216,6 +218,14 @@ export default function OrdensPage() {
   async function handleCreateOS() {
     if (!newOS.cliente_id || !newOS.scooter_id) {
       toast.error("Selecione o cliente e a scooter");
+      return;
+    }
+    if (!newOS.local) {
+      toast.error("Selecione o local de atendimento");
+      return;
+    }
+    if (newOS.local !== "caraguatatuba" && (!newOS.data || !newOS.hora)) {
+      toast.error("Selecione a data e o horário disponíveis (Ter/Qua/Qui, 10h–17h)");
       return;
     }
 
@@ -233,7 +243,7 @@ export default function OrdensPage() {
           tipo: newOS.tipo,
           local_atendimento: newOS.local || null,
           pedido_geral: newOS.observacoes || null,
-          data_agendamento: newOS.local === "caraguatatuba" ? null : (newOS.data_agendamento || null),
+          data_agendamento: newOS.local === "caraguatatuba" ? null : `${newOS.data}T${newOS.hora}:00`,
           status_atendimento: newOS.local === "caraguatatuba" ? "aguardando_contato" : "agendado",
           observacoes: newOS.observacoes || null,
         })
@@ -611,25 +621,39 @@ export default function OrdensPage() {
               </Select>
             </div>
 
-            {newOS.local === "caraguatatuba" ? (
+            {newOS.local === "caraguatatuba" && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-2.5 flex items-start gap-2 text-xs">
                 <Info className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
                 <span className="text-amber-800">{MENSAGEM_A_COMBINAR} <b>Data/Horário: A combinar.</b></span>
               </div>
-            ) : (
-              <div>
-                <Label className="text-sm font-medium">Data e Hora do Agendamento</Label>
-                <div className="mt-1">
-                  <DateTimePicker
-                    value={newOS.data_agendamento}
-                    onChange={(val) =>
-                      setNewOS((prev) => ({ ...prev, data_agendamento: val }))
-                    }
-                    placeholder="Selecione o dia e o horario"
-                  />
-                </div>
-              </div>
             )}
+
+            {(() => {
+              const nLocal = LOCAIS_ATENDIMENTO.find((l) => l.value === newOS.local);
+              if (nLocal?.tipo !== "agenda") return null;
+              return (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-sm font-medium">Data (Ter/Qua/Qui)</Label>
+                    <Select items={Object.fromEntries(proximasDatasLocal(nLocal).map((d) => [d, new Date(d + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" })]))} value={newOS.data} onValueChange={(v) => setNewOS((p) => ({ ...p, data: v ?? "" }))}>
+                      <SelectTrigger className="w-full mt-1"><SelectValue placeholder="Dia" /></SelectTrigger>
+                      <SelectContent>
+                        {proximasDatasLocal(nLocal).map((d) => <SelectItem key={d} value={d}>{new Date(d + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" })}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Horário (10h–17h)</Label>
+                    <Select items={Object.fromEntries(horariosLocal(nLocal).map((h) => [h, h]))} value={newOS.hora} onValueChange={(v) => setNewOS((p) => ({ ...p, hora: v ?? "" }))}>
+                      <SelectTrigger className="w-full mt-1"><SelectValue placeholder="Hora" /></SelectTrigger>
+                      <SelectContent>
+                        {horariosLocal(nLocal).map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div>
               <Label className="text-sm font-medium">Observacoes</Label>

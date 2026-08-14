@@ -14,9 +14,10 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { Plus, ChevronRight, Wrench, AlertTriangle, FileWarning, Info, MapPin } from "lucide-react";
+import { Plus, ChevronRight, Wrench, AlertTriangle, FileWarning, Info, MapPin, ShieldCheck, CheckCircle2 } from "lucide-react";
 import {
   LOCAIS_ATENDIMENTO, proximasDatasLocal, horariosLocal, MENSAGEM_A_COMBINAR, TIPOS_SOLICITACAO,
+  PREVENTIVA_VALOR, PREVENTIVA_INTERVALO_DIAS,
 } from "@/lib/constants";
 
 interface Ordem {
@@ -181,6 +182,20 @@ export default function ClienteOrdensPage() {
                 </Select>
               </div>
 
+              {/* Aviso da manutenção preventiva: 1ª grátis, demais R$ 300 */}
+              {form.tipo === "preventiva" && (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 flex items-start gap-2 text-sm">
+                  <ShieldCheck className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-semibold text-emerald-800">Manutenção preventiva a cada {PREVENTIVA_INTERVALO_DIAS} dias</p>
+                    <p className="text-emerald-700">
+                      A <strong>1ª manutenção preventiva é gratuita</strong>. As demais seguem o valor de{" "}
+                      <strong>R$ {PREVENTIVA_VALOR},00</strong> por revisão.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> Local de atendimento (escolha o mais perto)</Label>
                 <Select items={Object.fromEntries(LOCAIS_ATENDIMENTO.map((l) => [l.value, l.label]))} value={form.local} onValueChange={v => setForm({...form, local: v ?? "", data: "", hora: ""})}>
@@ -252,6 +267,18 @@ export default function ClienteOrdensPage() {
                 <Label>Pedido / problema apresentado</Label>
                 <Textarea placeholder="Descreva o problema ou o motivo da manutenção..." value={form.pedido} onChange={e => setForm({...form, pedido: e.target.value})} />
               </div>
+
+              {/* Mensagem de ciência */}
+              <div className="rounded-lg border bg-muted/40 p-3 flex items-start gap-2 text-xs text-muted-foreground">
+                <CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                <p>
+                  Ao solicitar, você declara estar <strong>ciente</strong> de que a{" "}
+                  <strong>1ª manutenção preventiva é gratuita</strong> e as demais têm o valor de{" "}
+                  <strong>R$ {PREVENTIVA_VALOR},00</strong> por revisão. Nossa equipe entrará em contato para
+                  confirmar os detalhes do atendimento.
+                </p>
+              </div>
+
               <Button type="submit" className="w-full" disabled={saving}>
                 {saving ? "Enviando..." : "Solicitar atendimento"}
               </Button>

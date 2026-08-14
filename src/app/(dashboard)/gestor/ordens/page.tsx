@@ -51,6 +51,9 @@ import { createClient } from "@/lib/supabase/client";
 import {
   ORDER_STATUS_LABELS,
   ORDER_STATUS_COLORS,
+  LOCAIS_ATENDIMENTO,
+  MENSAGEM_A_COMBINAR,
+  TIPOS_SOLICITACAO,
 } from "@/lib/constants";
 import type {
   OrdemServico,
@@ -66,6 +69,8 @@ import {
   ClipboardList,
   Check,
   ChevronsUpDown,
+  MapPin,
+  Info,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -102,6 +107,8 @@ export default function OrdensPage() {
   const [newOS, setNewOS] = useState({
     cliente_id: "",
     scooter_id: "",
+    tipo: "preventiva",
+    local: "",
     data_agendamento: "",
     observacoes: "",
   });
@@ -200,7 +207,7 @@ export default function OrdensPage() {
   }
 
   function handleOpenDialog() {
-    setNewOS({ cliente_id: "", scooter_id: "", data_agendamento: "", observacoes: "" });
+    setNewOS({ cliente_id: "", scooter_id: "", tipo: "preventiva", local: "", data_agendamento: "", observacoes: "" });
     setScootersCliente([]);
     loadClientes();
     setDialogOpen(true);
@@ -223,7 +230,11 @@ export default function OrdensPage() {
           cliente_id: newOS.cliente_id,
           scooter_id: newOS.scooter_id,
           status: "agendado" as const,
-          data_agendamento: newOS.data_agendamento || null,
+          tipo: newOS.tipo,
+          local_atendimento: newOS.local || null,
+          pedido_geral: newOS.observacoes || null,
+          data_agendamento: newOS.local === "caraguatatuba" ? null : (newOS.data_agendamento || null),
+          status_atendimento: newOS.local === "caraguatatuba" ? "aguardando_contato" : "agendado",
           observacoes: newOS.observacoes || null,
         })
         .select("id, numero")
@@ -577,17 +588,48 @@ export default function OrdensPage() {
             </div>
 
             <div>
-              <Label className="text-sm font-medium">Data e Hora do Agendamento</Label>
-              <div className="mt-1">
-                <DateTimePicker
-                  value={newOS.data_agendamento}
-                  onChange={(val) =>
-                    setNewOS((prev) => ({ ...prev, data_agendamento: val }))
-                  }
-                  placeholder="Selecione o dia e o horario"
-                />
-              </div>
+              <Label className="text-sm font-medium">Tipo de solicitação</Label>
+              <Select items={Object.fromEntries(TIPOS_SOLICITACAO.map((t) => [t.value, t.label]))} value={newOS.tipo} onValueChange={(v) => v && setNewOS((p) => ({ ...p, tipo: v }))}>
+                <SelectTrigger className="w-full mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {TIPOS_SOLICITACAO.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
+
+            <div>
+              <Label className="text-sm font-medium flex items-center gap-1"><MapPin className="h-4 w-4" /> Local de atendimento</Label>
+              <Select items={Object.fromEntries(LOCAIS_ATENDIMENTO.map((l) => [l.value, l.label]))} value={newOS.local} onValueChange={(v) => setNewOS((p) => ({ ...p, local: v ?? "" }))}>
+                <SelectTrigger className="w-full mt-1"><SelectValue placeholder="Selecione o local" /></SelectTrigger>
+                <SelectContent>
+                  {LOCAIS_ATENDIMENTO.map((l) => (
+                    <SelectItem key={l.value} value={l.value}>
+                      <div className="flex flex-col"><span>{l.label}</span><span className="text-[11px] text-muted-foreground">{l.endereco}</span></div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {newOS.local === "caraguatatuba" ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-2.5 flex items-start gap-2 text-xs">
+                <Info className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                <span className="text-amber-800">{MENSAGEM_A_COMBINAR} <b>Data/Horário: A combinar.</b></span>
+              </div>
+            ) : (
+              <div>
+                <Label className="text-sm font-medium">Data e Hora do Agendamento</Label>
+                <div className="mt-1">
+                  <DateTimePicker
+                    value={newOS.data_agendamento}
+                    onChange={(val) =>
+                      setNewOS((prev) => ({ ...prev, data_agendamento: val }))
+                    }
+                    placeholder="Selecione o dia e o horario"
+                  />
+                </div>
+              </div>
+            )}
 
             <div>
               <Label className="text-sm font-medium">Observacoes</Label>

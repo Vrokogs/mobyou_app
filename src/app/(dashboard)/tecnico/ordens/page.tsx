@@ -13,7 +13,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { Search, Wrench, Plus, Loader2 } from "lucide-react";
+import { Search, Wrench, Plus, Loader2, MapPin, Info } from "lucide-react";
+import {
+  LOCAIS_ATENDIMENTO, proximasDatasLocal, horariosLocal, MENSAGEM_A_COMBINAR, TIPOS_SOLICITACAO,
+} from "@/lib/constants";
 
 interface Ordem {
   id: string;
@@ -43,7 +46,7 @@ const STATUS_COLORS: Record<string, string> = {
 interface ClienteOpt { id: string; nome: string }
 interface ScooterOpt { id: string; modelo: string; chassi: string | null; cliente_id: string | null }
 
-const EMPTY_OS = { cliente_id: "", scooter_id: "", data_agendamento: "", observacoes: "" };
+const EMPTY_OS = { cliente_id: "", scooter_id: "", tipo: "preventiva", local: "", data: "", hora: "", observacoes: "" };
 
 export default function TecnicoOrdensPage() {
   const [ordens, setOrdens] = useState<Ordem[]>([]);
@@ -81,19 +84,32 @@ export default function TecnicoOrdensPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  const localSel = LOCAIS_ATENDIMENTO.find((l) => l.value === form.local);
+
   async function criarOS() {
     if (!form.cliente_id) { toast.error("Selecione o cliente."); return; }
     if (!form.scooter_id) { toast.error("Selecione a scooter."); return; }
+    if (!form.local) { toast.error("Selecione o local de atendimento."); return; }
+    const aCombinar = localSel?.tipo === "a_combinar";
+    if (!aCombinar && (!form.data || !form.hora)) {
+      toast.error("Selecione a data e o horário.");
+      return;
+    }
     setSaving(true);
     try {
       const supabase = createClient();
+      const dataAgendamento = aCombinar ? null : `${form.data}T${form.hora}:00`;
       const { error } = await (supabase.from("ordens_servico") as any).insert({
         cliente_id: form.cliente_id,
         scooter_id: form.scooter_id,
         tecnico_id: userId,
         status: "recebido",
-        data_agendamento: form.data_agendamento ? new Date(form.data_agendamento).toISOString() : null,
+        tipo: form.tipo,
+        local_atendimento: form.local,
+        pedido_geral: form.observacoes || null,
         observacoes: form.observacoes || null,
+        data_agendamento: dataAgendamento,
+        status_atendimento: aCombinar ? "aguardando_contato" : "agendado",
       });
       if (error) throw error;
       toast.success("Ordem de serviço criada!");
@@ -161,12 +177,63 @@ export default function TecnicoOrdensPage() {
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Data/hora (opcional)</Label>
-                <Input type="datetime-local" value={form.data_agendamento}
-                  onChange={(e) => setForm((f) => ({ ...f, data_agendamento: e.target.value }))} />
+                <Label className="text-xs">Tipo de solicitação</Label>
+                <Select items={Object.fromEntries(TIPOS_SOLICITACAO.map((t) => [t.value, t.label]))} value={form.tipo}
+                  onValueChange={(v) => v && setForm((f) => ({ ...f, tipo: v }))}>
+                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {TIPOS_SOLICITACAO.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
+
               <div className="space-y-1">
-                <Label className="text-xs">Observações</Label>
+                <Label className="text-xs flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> Local de atendimento</Label>
+                <Select items={Object.fromEntries(LOCAIS_ATENDIMENTO.map((l) => [l.value, l.label]))} value={form.local}
+                  onValueChange={(v) => setForm((f) => ({ ...f, local: v ?? "", data: "", hora: "" }))}>
+                  <SelectTrigger className="w-full"><SelectValue placeholder="Selecione o local" /></SelectTrigger>
+                  <SelectContent>
+                    {LOCAIS_ATENDIMENTO.map((l) => (
+                      <SelectItem key={l.value} value={l.value}>
+                        <div className="flex flex-col"><span>{l.label}</span><span className="text-[11px] text-muted-foreground">{l.endereco}</span></div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {localSel?.tipo === "a_combinar" && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-2.5 flex items-start gap-2 text-xs">
+                  <Info className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                  <span className="text-amber-800">{MENSAGEM_A_COMBINAR} <b>Data/Horário: A combinar.</b></span>
+                </div>
+              )}
+
+              {localSel?.tipo === "agenda" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Data (Ter/Qua/Qui)</Label>
+                    <Select items={Object.fromEntries(proximasDatasLocal(localSel).map((d) => [d, new Date(d + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" })]))} value={form.data} onValueChange={(v) => setForm((f) => ({ ...f, data: v ?? "" }))}>
+                      <SelectTrigger className="w-full"><SelectValue placeholder="Dia" /></SelectTrigger>
+                      <SelectContent>
+                        {proximasDatasLocal(localSel).map((d) => <SelectItem key={d} value={d}>{new Date(d + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" })}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Horário (10h–17h)</Label>
+                    <Select items={Object.fromEntries(horariosLocal(localSel).map((h) => [h, h]))} value={form.hora} onValueChange={(v) => setForm((f) => ({ ...f, hora: v ?? "" }))}>
+                      <SelectTrigger className="w-full"><SelectValue placeholder="Hora" /></SelectTrigger>
+                      <SelectContent>
+                        {horariosLocal(localSel).map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <Label className="text-xs">Pedido / problema</Label>
                 <Textarea rows={2} placeholder="Motivo do serviço, sintomas relatados..."
                   value={form.observacoes} onChange={(e) => setForm((f) => ({ ...f, observacoes: e.target.value }))} />
               </div>

@@ -7,9 +7,10 @@ const env = fs.readFileSync(".env.local", "utf8");
 const get = (k) => (env.match(new RegExp(`${k}=(.*)`)) || [])[1]?.trim();
 const url = get("NEXT_PUBLIC_SUPABASE_URL");
 const serviceKey = get("SUPABASE_SERVICE_ROLE_KEY");
+const SEED_PASSWORD = get("SEED_PASSWORD") || process.env.SEED_PASSWORD;
 
-if (!url || !serviceKey) {
-  console.error("Faltam NEXT_PUBLIC_SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY no .env.local");
+if (!url || !serviceKey || !SEED_PASSWORD) {
+  console.error("Faltam NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / SEED_PASSWORD no .env.local");
   process.exit(1);
 }
 
@@ -18,9 +19,9 @@ const admin = createClient(url, serviceKey, {
 });
 
 const contas = [
-  { email: "gestor@mobyou.com", senha: "gestor123", nome: "Gestor Teste", role: "gestor" },
-  { email: "vendedor@mobyou.com", senha: "vendedor123", nome: "Vendedor Teste", role: "vendedor" },
-  { email: "cliente@mobyou.com", senha: "cliente123", nome: "Maria Cliente", role: "cliente" },
+  { email: "gestor@mobyou.com", senha: SEED_PASSWORD, nome: "Gestor Teste", role: "gestor" },
+  { email: "vendedor@mobyou.com", senha: SEED_PASSWORD, nome: "Vendedor Teste", role: "vendedor" },
+  { email: "cliente@mobyou.com", senha: SEED_PASSWORD, nome: "Maria Cliente", role: "cliente" },
 ];
 
 async function acharPorEmail(email) {

@@ -10,7 +10,8 @@ const admin = createClient(get("NEXT_PUBLIC_SUPABASE_URL"), get("SUPABASE_SERVIC
 });
 
 const CPF = "01793883807";
-const NOVA_SENHA = "gilmara123";
+const NOVA_SENHA = process.env.NOVA_SENHA || g("SEED_PASSWORD");
+if (!NOVA_SENHA) { console.error("Defina SEED_PASSWORD no .env.local ou NOVA_SENHA no ambiente."); process.exit(1); }
 
 // acha o perfil pelo CPF (nome pode ter typo)
 let { data: pf } = await admin

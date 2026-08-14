@@ -4,16 +4,17 @@ const env = readFileSync(".env.local", "utf8");
 const getEnv = (k) => (env.match(new RegExp("^" + k + "=(.*)", "m")) || [])[1]?.trim();
 const SUPABASE_URL = getEnv("NEXT_PUBLIC_SUPABASE_URL");
 const SERVICE_KEY = getEnv("SUPABASE_SERVICE_ROLE_KEY");
-if (!SUPABASE_URL || !SERVICE_KEY) {
-  console.error("Faltam NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY no .env.local");
+const SEED_PASSWORD = getEnv("SEED_PASSWORD") || process.env.SEED_PASSWORD;
+if (!SUPABASE_URL || !SERVICE_KEY || !SEED_PASSWORD) {
+  console.error("Faltam NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / SEED_PASSWORD no .env.local");
   process.exit(1);
 }
 
 const users = [
-  { email: "gestor@mobyou.com", password: "Mobyou@2024", nome: "Admin Gestor", role: "gestor", cpf: "111.111.111-11", telefone: "(12) 99999-0001" },
-  { email: "vendedor@mobyou.com", password: "Mobyou@2024", nome: "Carlos Vendedor", role: "vendedor", cpf: "222.222.222-22", telefone: "(12) 99999-0002" },
-  { email: "tecnico@mobyou.com", password: "Mobyou@2024", nome: "Ricardo Tecnico", role: "tecnico", cpf: "333.333.333-33", telefone: "(12) 99999-0003" },
-  { email: "cliente@mobyou.com", password: "Mobyou@2024", nome: "Maria Cliente", role: "cliente", cpf: "444.444.444-44", telefone: "(12) 99999-0004" },
+  { email: "gestor@mobyou.com", password: SEED_PASSWORD, nome: "Admin Gestor", role: "gestor", cpf: "111.111.111-11", telefone: "(12) 99999-0001" },
+  { email: "vendedor@mobyou.com", password: SEED_PASSWORD, nome: "Carlos Vendedor", role: "vendedor", cpf: "222.222.222-22", telefone: "(12) 99999-0002" },
+  { email: "tecnico@mobyou.com", password: SEED_PASSWORD, nome: "Ricardo Tecnico", role: "tecnico", cpf: "333.333.333-33", telefone: "(12) 99999-0003" },
+  { email: "cliente@mobyou.com", password: SEED_PASSWORD, nome: "Maria Cliente", role: "cliente", cpf: "444.444.444-44", telefone: "(12) 99999-0004" },
 ];
 
 async function createUser(user) {

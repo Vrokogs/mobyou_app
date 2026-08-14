@@ -151,15 +151,8 @@ async function run() {
   await client.end();
 
   console.log('\n=== DONE ===');
-  console.log('\nTest accounts:');
-  console.log('┌─────────────┬──────────────────────┬───────────────┐');
-  console.log('│ Role        │ Email                │ Password      │');
-  console.log('├─────────────┼──────────────────────┼───────────────┤');
-  console.log('│ gestor      │ gestor@mobyou.com    │ Mobyou@2024   │');
-  console.log('│ vendedor    │ vendedor@mobyou.com  │ Mobyou@2024   │');
-  console.log('│ tecnico     │ tecnico@mobyou.com   │ Mobyou@2024   │');
-  console.log('│ cliente     │ cliente@mobyou.com   │ Mobyou@2024   │');
-  console.log('└─────────────┴──────────────────────┴───────────────┘');
+  console.log('\nTest accounts criadas (senha definida via SEED_PASSWORD do ambiente):');
+  console.log('  gestor@mobyou.com | vendedor@mobyou.com | tecnico@mobyou.com | cliente@mobyou.com');
 }
 
 run().catch(err => { console.error('Fatal:', err.message); process.exit(1); });

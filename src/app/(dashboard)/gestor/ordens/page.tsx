@@ -634,7 +634,7 @@ export default function OrdensPage() {
               return (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label className="text-sm font-medium">Data (Ter/Qua/Qui)</Label>
+                    <Label className="text-sm font-medium">Dia p/ deixar a moto (Ter/Qua/Qui)</Label>
                     <Select items={Object.fromEntries(proximasDatasLocal(nLocal).map((d) => [d, new Date(d + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" })]))} value={newOS.data} onValueChange={(v) => setNewOS((p) => ({ ...p, data: v ?? "" }))}>
                       <SelectTrigger className="w-full mt-1"><SelectValue placeholder="Dia" /></SelectTrigger>
                       <SelectContent>
@@ -643,7 +643,7 @@ export default function OrdensPage() {
                     </Select>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium">Horário (10h–17h)</Label>
+                    <Label className="text-sm font-medium">Horário de entrega (10h–17h)</Label>
                     <Select items={Object.fromEntries(horariosLocal(nLocal).map((h) => [h, h]))} value={newOS.hora} onValueChange={(v) => setNewOS((p) => ({ ...p, hora: v ?? "" }))}>
                       <SelectTrigger className="w-full mt-1"><SelectValue placeholder="Hora" /></SelectTrigger>
                       <SelectContent>

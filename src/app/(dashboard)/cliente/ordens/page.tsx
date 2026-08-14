@@ -214,9 +214,11 @@ export default function ClienteOrdensPage() {
 
               {/* Centro / Costa Sul: agenda Ter/Qua/Qui, 10h–17h */}
               {localSel?.tipo === "agenda" && (
+                <div className="space-y-2">
+                <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Info className="h-3 w-3" /> O horário é para você <b>deixar/entregar a moto</b> na assistência.</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Data (Ter/Qua/Qui)</Label>
+                    <Label className="text-xs">Dia para deixar a moto (Ter/Qua/Qui)</Label>
                     <Select items={Object.fromEntries(proximasDatasLocal(localSel).map((d) => [d, new Date(d + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" })]))} value={form.data} onValueChange={v => setForm({...form, data: v ?? ""})}>
                       <SelectTrigger className="w-full"><SelectValue placeholder="Escolha o dia" /></SelectTrigger>
                       <SelectContent>
@@ -227,7 +229,7 @@ export default function ClienteOrdensPage() {
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Horário (10h–17h)</Label>
+                    <Label className="text-xs">Horário de entrega (10h–17h)</Label>
                     <Select items={Object.fromEntries(horariosLocal(localSel).map((h) => [h, h]))} value={form.hora} onValueChange={v => setForm({...form, hora: v ?? ""})}>
                       <SelectTrigger className="w-full"><SelectValue placeholder="Horário" /></SelectTrigger>
                       <SelectContent>
@@ -235,6 +237,7 @@ export default function ClienteOrdensPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
                 </div>
               )}
 

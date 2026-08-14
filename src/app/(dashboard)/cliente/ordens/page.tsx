@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -52,10 +53,16 @@ export default function ClienteOrdensPage() {
   const [contratosPendentes, setContratosPendentes] = useState(0);
 
   const localSel = LOCAIS_ATENDIMENTO.find((l) => l.value === form.local);
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     load();
   }, []);
+
+  // Abre o agendamento automaticamente quando vem de um botão "Agendar" (?nova=true)
+  useEffect(() => {
+    if (searchParams.get("nova") === "true") setDialogOpen(true);
+  }, [searchParams]);
 
   async function load() {
     const supabase = createClient();

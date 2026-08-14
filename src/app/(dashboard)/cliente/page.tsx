@@ -109,6 +109,26 @@ export default function ClienteDashboardPage() {
         <p className="text-muted-foreground">Bem-vindo ao seu painel MOBYOU</p>
       </div>
 
+      {/* Destaque: agendar entrega da moto */}
+      <Card className="border-primary/30 bg-gradient-to-br from-primary/10 to-transparent">
+        <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-primary/15 p-3">
+              <Calendar className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <p className="font-semibold text-lg">Precisa de manutenção ou revisão?</p>
+              <p className="text-sm text-muted-foreground">
+                Agende o dia e o horário para <strong>deixar sua moto</strong> na assistência mais perto de você.
+              </p>
+            </div>
+          </div>
+          <Button size="lg" className="w-full sm:w-auto shrink-0" render={<Link href="/cliente/ordens?nova=true" />}>
+            <Calendar className="h-4 w-4 mr-2" /> Agendar entrega da moto
+          </Button>
+        </CardContent>
+      </Card>
+
       {ordensAtivas.length > 0 && (
         <Card className="border-primary/20 bg-primary/5">
           <CardHeader>

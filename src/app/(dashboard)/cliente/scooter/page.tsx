@@ -8,6 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import { Bike, ShieldCheck, MapPin, Calendar, Hash, Battery, Cpu, Cog, CalendarClock, Gift } from "lucide-react";
 import { GARANTIA_MODALIDADE_LABEL } from "@/lib/constants";
 
@@ -256,6 +258,9 @@ export default function ClienteScooterPage() {
                           );
                         })}
                       </div>
+                      <Button className="w-full mt-3" render={<Link href="/cliente/ordens?nova=true" />}>
+                        <Calendar className="h-4 w-4 mr-2" /> Agendar entrega da moto
+                      </Button>
                     </div>
                   </>
                 )}

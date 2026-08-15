@@ -153,18 +153,27 @@ const PREVENTIVA_QTD_POR_MODALIDADE: Record<string, number> = {
   '1_ano': 4,
 };
 
-// Modelo Bibi: todas as preventivas são PAGAS e a revisão é sugestiva (dentro de 90 dias).
+// Modelo Bibi: vendido com garantia de 3 meses (revisão paga e sugestiva, como toda a modalidade de 3 meses).
 export function isModeloBibi(modelo: string | null | undefined): boolean {
   return !!modelo && modelo.toLowerCase().includes('bibi');
 }
 
+// Revisão paga sempre (sem 1ª gratuita): modalidade de 3 meses (inclui o Bibi).
+// 6 meses e 1 ano: a 1ª pode ser gratuita.
+export function preventivaSemprePaga(
+  modalidade: string | null | undefined,
+  modelo?: string | null,
+): boolean {
+  return modalidade === '3_meses' || isModeloBibi(modelo);
+}
+
 // Para 6 meses e 1 ano a revisão é obrigatória para manter a garantia.
-// Para 3 meses é sugestiva. O modelo Bibi é sempre sugestivo.
+// Para 3 meses (e o modelo Bibi) é sugestiva.
 export function preventivaObrigatoria(
   modalidade: string | null | undefined,
   modelo?: string | null,
 ): boolean {
-  if (isModeloBibi(modelo)) return false;
+  if (preventivaSemprePaga(modalidade, modelo)) return false;
   return modalidade === '6_meses' || modalidade === '1_ano';
 }
 
@@ -184,7 +193,7 @@ export function gerarPreventivas(
   primeiraGratuita: boolean,
   modelo?: string | null,
 ): PreventivaGerada[] {
-  const bibi = isModeloBibi(modelo);
+  const semprePaga = preventivaSemprePaga(modalidade, modelo);
   const qtd = PREVENTIVA_QTD_POR_MODALIDADE[modalidade] ?? 4;
   const obrigatoria = preventivaObrigatoria(modalidade, modelo);
   const base = new Date(dataInicioISO + 'T12:00:00');
@@ -192,8 +201,8 @@ export function gerarPreventivas(
   for (let i = 1; i <= qtd; i++) {
     const d = new Date(base);
     d.setDate(d.getDate() + PREVENTIVA_INTERVALO_DIAS * i);
-    // Bibi nunca tem revisão gratuita; nos demais, a 1ª pode ser gratuita.
-    const gratuita = !bibi && i === 1 && primeiraGratuita;
+    // 3 meses / Bibi: sempre paga. Nos demais (6m/1a), a 1ª pode ser gratuita.
+    const gratuita = !semprePaga && i === 1 && primeiraGratuita;
     out.push({
       numero: i,
       data_prevista: d.toISOString().slice(0, 10),

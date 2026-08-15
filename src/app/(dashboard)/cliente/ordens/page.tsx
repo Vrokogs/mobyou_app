@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { Plus, ChevronRight, Wrench, AlertTriangle, FileWarning, Info, MapPin, ShieldCheck, CheckCircle2 } from "lucide-react";
 import {
   LOCAIS_ATENDIMENTO, proximasDatasLocal, horariosLocal, MENSAGEM_A_COMBINAR, TIPOS_SOLICITACAO,
-  PREVENTIVA_VALOR, PREVENTIVA_INTERVALO_DIAS, isModeloBibi,
+  PREVENTIVA_VALOR, PREVENTIVA_INTERVALO_DIAS, preventivaSemprePaga,
 } from "@/lib/constants";
 
 interface Ordem {
@@ -32,6 +32,7 @@ interface Scooter {
   id: string;
   modelo: string;
   chassi: string;
+  modalidade?: string | null;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -55,7 +56,8 @@ export default function ClienteOrdensPage() {
 
   const localSel = LOCAIS_ATENDIMENTO.find((l) => l.value === form.local);
   const scooterSel = scooters.find((s) => s.id === form.scooter_id);
-  const bibiSel = isModeloBibi(scooterSel?.modelo);
+  // 3 meses (inclui Bibi): revisão sempre paga e sugestiva. 6m/1a: 1ª grátis + obrigatória.
+  const pagaSugestiva = preventivaSemprePaga(scooterSel?.modalidade, scooterSel?.modelo);
   const searchParams = useSearchParams();
 
   useEffect(() => {
@@ -81,7 +83,15 @@ export default function ClienteOrdensPage() {
     ]);
 
     if (ordensRes.data) setOrdens(ordensRes.data as unknown as Ordem[]);
-    if (scootersRes.data) setScooters(scootersRes.data as unknown as Scooter[]);
+    if (scootersRes.data) {
+      const ids = scootersRes.data.map((s) => s.id);
+      const { data: garantias } = await supabase
+        .from("garantias")
+        .select("scooter_id, modalidade")
+        .in("scooter_id", ids);
+      const modByScooter = new Map((garantias ?? []).map((g: any) => [g.scooter_id, g.modalidade]));
+      setScooters(scootersRes.data.map((s) => ({ ...s, modalidade: modByScooter.get(s.id) ?? null })) as unknown as Scooter[]);
+    }
     setContratosPendentes((contratosRes.data ?? []).length);
     setLoading(false);
   }
@@ -184,16 +194,17 @@ export default function ClienteOrdensPage() {
                 </Select>
               </div>
 
-              {/* Aviso da manutenção preventiva (varia conforme o modelo) */}
+              {/* Aviso da manutenção preventiva (varia conforme a garantia da moto) */}
               {form.tipo === "preventiva" && (
-                bibiSel ? (
+                pagaSugestiva ? (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 flex items-start gap-2 text-sm">
                     <ShieldCheck className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
                     <div className="space-y-1">
-                      <p className="font-semibold text-amber-800">Modelo Bibi — revisão sugestiva (a cada {PREVENTIVA_INTERVALO_DIAS} dias)</p>
+                      <p className="font-semibold text-amber-800">Revisão sugestiva (a cada {PREVENTIVA_INTERVALO_DIAS} dias)</p>
                       <p className="text-amber-700">
-                        No modelo Bibi a revisão é <strong>sugestiva</strong> e <strong>todas as manutenções
-                        preventivas são pagas</strong>, no valor de <strong>R$ {PREVENTIVA_VALOR},00</strong> por revisão.
+                        Para esta moto (garantia de 3 meses) a revisão é <strong>sugestiva</strong> e{" "}
+                        <strong>todas as manutenções preventivas são pagas</strong>, no valor de{" "}
+                        <strong>R$ {PREVENTIVA_VALOR},00</strong> por revisão.
                       </p>
                     </div>
                   </div>
@@ -288,8 +299,8 @@ export default function ClienteOrdensPage() {
                 <CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                 <p>
                   Ao solicitar, você declara estar <strong>ciente</strong> de que{" "}
-                  {bibiSel ? (
-                    <>no modelo <strong>Bibi</strong> a revisão é <strong>sugestiva</strong> e{" "}
+                  {pagaSugestiva ? (
+                    <>para esta moto (garantia de 3 meses) a revisão é <strong>sugestiva</strong> e{" "}
                     <strong>todas as manutenções preventivas são pagas</strong> (R$ {PREVENTIVA_VALOR},00 por revisão)</>
                   ) : (
                     <>a <strong>1ª manutenção preventiva é gratuita</strong> e as demais têm o valor de{" "}

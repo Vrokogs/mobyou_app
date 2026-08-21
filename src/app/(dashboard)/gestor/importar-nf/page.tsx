@@ -21,7 +21,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { NotaFiscal } from "@/types/database";
-import { UNIDADES_VENDA, GARANTIA_MODALIDADES, gerarPreventivas } from "@/lib/constants";
+import {
+  UNIDADES_VENDA, GARANTIA_MODALIDADES, gerarPreventivas, isClienteLegado, DATA_CORTE_LEGADO,
+} from "@/lib/constants";
 import { Checkbox } from "@/components/ui/checkbox";
 
 interface ClienteData {
@@ -53,6 +55,8 @@ interface VendaData {
   vendedor_id: string;
   modalidade: string;
   primeira_gratuita: boolean;
+  // Venda anterior ao sistema, marcada à mão (a data de compra nem sempre confere)
+  cliente_antigo: boolean;
 }
 
 interface ExtractedData {
@@ -68,7 +72,7 @@ const EMPTY_SCOOTER: ScooterData = {
 const EMPTY_DATA: ExtractedData = {
   cliente: { nome: "", cpf: "", telefone: "", email: "", endereco: "", senha: "" },
   scooters: [{ ...EMPTY_SCOOTER }],
-  venda: { valor: "", parcelas: "1", data_compra: new Date().toISOString().slice(0, 10), numero_nf: "", forma_pagamento: "pix", unidade: "", vendedor_id: "", modalidade: "1_ano", primeira_gratuita: true },
+  venda: { valor: "", parcelas: "1", data_compra: new Date().toISOString().slice(0, 10), numero_nf: "", forma_pagamento: "pix", unidade: "", vendedor_id: "", modalidade: "1_ano", primeira_gratuita: true, cliente_antigo: false },
 };
 
 function cloneEmpty(): ExtractedData {
@@ -351,6 +355,9 @@ export default function ImportarNFPage() {
 
       // 2. Create each scooter + garantia (modalidade define a duração)
       const dataInicio = venda.data_compra || new Date().toISOString().slice(0, 10);
+      // Compra anterior a 20/08/2026: cliente legado — sem contrato para assinar
+      // e sem agenda de manutenções preventivas (mantém o acesso normal ao app).
+      const legado = isClienteLegado(dataInicio, venda.cliente_antigo);
       const meses = GARANTIA_MODALIDADES.find((m) => m.value === venda.modalidade)?.meses ?? 12;
       const dataFim = new Date(dataInicio + "T12:00:00");
       dataFim.setMonth(dataFim.getMonth() + meses);
@@ -368,6 +375,7 @@ export default function ImportarNFPage() {
           ano: scooter.ano ? parseInt(scooter.ano) : null,
           cliente_id: clienteId,
           data_compra: dataInicio,
+          legado,
         }).select("id").single();
 
         if (scooterError) {
@@ -388,19 +396,22 @@ export default function ImportarNFPage() {
           status: "ativa",
         }).select("id").single();
 
-        // Agenda das revisões conforme a modalidade (3m=sugestiva; 6m/1a=obrigatória)
-        const preventivas = gerarPreventivas(dataInicio, venda.modalidade, venda.primeira_gratuita, scooter.modelo).map((p) => ({
-          scooter_id: scooterId,
-          cliente_id: clienteId,
-          garantia_id: garRow?.id ?? null,
-          numero: p.numero,
-          data_prevista: p.data_prevista,
-          gratuita: p.gratuita,
-          obrigatoria: p.obrigatoria,
-          valor: p.valor,
-          status: "pendente",
-        }));
-        await (supabase.from("manutencoes_preventivas") as any).insert(preventivas);
+        // Agenda das revisões conforme a modalidade (3m=sugestiva; 6m/1a=obrigatória).
+        // Clientes legados não têm agenda de revisões nem preventiva gratuita.
+        if (!legado) {
+          const preventivas = gerarPreventivas(dataInicio, venda.modalidade, venda.primeira_gratuita, scooter.modelo).map((p) => ({
+            scooter_id: scooterId,
+            cliente_id: clienteId,
+            garantia_id: garRow?.id ?? null,
+            numero: p.numero,
+            data_prevista: p.data_prevista,
+            gratuita: p.gratuita,
+            obrigatoria: p.obrigatoria,
+            valor: p.valor,
+            status: "pendente",
+          }));
+          await (supabase.from("manutencoes_preventivas") as any).insert(preventivas);
+        }
 
         // Registra a venda vinculada ao vendedor e à unidade (loja)
         const itemValor = scooter.valor
@@ -422,6 +433,7 @@ export default function ImportarNFPage() {
 
       // 3. Gera os 3 documentos (Contrato de Compra e Venda + 2 Termos) a partir
       //    dos modelos, com os dados do cliente e da scooter, prontos p/ assinatura.
+      //    Cliente legado (compra antes do corte) não recebe contrato para assinar.
       const s0 = validScooters[0];
       const dataExt = new Date().toLocaleDateString("pt-BR", {
         day: "numeric", month: "long", year: "numeric",
@@ -448,7 +460,7 @@ export default function ImportarNFPage() {
         .in("tipo", ["compra_venda", "entrega", "desbloqueio"])
         .eq("ativo", true);
 
-      if (modelos && modelos.length > 0) {
+      if (!legado && modelos && modelos.length > 0) {
         // Para compra_venda, usa o contrato da modalidade de garantia escolhida
         const selecionados = (modelos as { tipo: string; titulo: string; conteudo_template: string; modalidade: string | null }[])
           .filter((m) => m.tipo !== "compra_venda" || m.modalidade === venda.modalidade || m.modalidade == null);
@@ -499,7 +511,9 @@ export default function ImportarNFPage() {
       });
 
       toast.success("Importacao concluida com sucesso!", {
-        description: `Cliente, ${validScooters.length} scooter(s), garantia(s), venda(s) e contrato foram criados.`,
+        description: legado
+          ? `Cliente legado (compra antes de ${new Date(DATA_CORTE_LEGADO + "T12:00:00").toLocaleDateString("pt-BR")}): ${validScooters.length} scooter(s), garantia(s) e venda(s) criados, sem contrato para assinar e sem agenda de revisões.`
+          : `Cliente, ${validScooters.length} scooter(s), garantia(s), venda(s) e contrato foram criados.`,
       });
       setImported(true);
       loadHistorico();
@@ -526,6 +540,12 @@ export default function ImportarNFPage() {
       return dateStr;
     }
   }
+
+  // Compra anterior a 20/08/2026: cliente legado (sem contrato e sem revisões).
+  const vendaLegada = isClienteLegado(
+    extractedData?.venda.data_compra,
+    extractedData?.venda.cliente_antigo,
+  );
 
   const scootersTotal = extractedData
     ? extractedData.scooters.reduce((sum, s) => sum + (parseFloat(s.valor) || 0), 0)
@@ -758,14 +778,39 @@ export default function ImportarNFPage() {
                   </div>
                   <label className="flex items-center gap-2 text-xs cursor-pointer">
                     <Checkbox
-                      checked={extractedData.venda.primeira_gratuita}
-                      onCheckedChange={(c) => updateVenda("primeira_gratuita", c === true)}
+                      checked={extractedData.venda.cliente_antigo}
+                      onCheckedChange={(c) => updateVenda("cliente_antigo", c === true)}
                     />
-                    1ª manutenção preventiva gratuita
+                    Cliente antigo (venda anterior ao sistema)
                   </label>
-                  <p className="text-[11px] text-muted-foreground">
-                    Serão agendadas manutenções preventivas a cada 60 dias automaticamente.
-                  </p>
+                  {vendaLegada ? (
+                    <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-800">
+                      <p className="font-semibold">
+                        {extractedData.venda.cliente_antigo
+                          ? "Cliente antigo — venda anterior ao sistema"
+                          : "Cliente antigo — compra anterior a " +
+                            new Date(DATA_CORTE_LEGADO + "T12:00:00").toLocaleDateString("pt-BR")}
+                      </p>
+                      <p>
+                        Não serão gerados contrato para assinatura nem agenda de revisões, e não há
+                        manutenção preventiva gratuita. O cliente continua com acesso normal ao app
+                        e pode agendar suas manutenções.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <label className="flex items-center gap-2 text-xs cursor-pointer">
+                        <Checkbox
+                          checked={extractedData.venda.primeira_gratuita}
+                          onCheckedChange={(c) => updateVenda("primeira_gratuita", c === true)}
+                        />
+                        1ª manutenção preventiva gratuita
+                      </label>
+                      <p className="text-[11px] text-muted-foreground">
+                        Serão agendadas manutenções preventivas a cada 60 dias automaticamente.
+                      </p>
+                    </>
+                  )}
                 </div>
                 <div className="rounded-md bg-muted/50 px-3 py-2 text-sm flex items-center justify-between">
                   <span className="text-muted-foreground">Soma dos itens</span>

@@ -66,6 +66,8 @@ export type Scooter = {
   km_atual: number | null;
   status: string | null;
   data_compra: string | null;
+  // Venda anterior ao sistema: sem contrato para assinar e sem revisões.
+  legado: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -232,6 +234,8 @@ export type Contrato = {
   variaveis: Record<string, unknown> | null;
   pdf_url: string | null;
   status: ContratoStatus;
+  // Assinado em papel, presencialmente (sem assinatura eletrônica registrada).
+  assinado_presencial: boolean;
   created_at: string;
   updated_at: string;
 };

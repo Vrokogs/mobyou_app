@@ -29,6 +29,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { isClienteLegado } from "@/lib/constants";
 
 interface Contrato {
   id: string;
@@ -37,6 +38,8 @@ interface Contrato {
   status: string;
   conteudo: string | null;
   pdf_url: string | null;
+  scooter_id: string | null;
+  assinado_presencial: boolean;
   created_at: string;
 }
 
@@ -87,6 +90,8 @@ export default function ClienteDocumentosPage() {
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [userNome, setUserNome] = useState("");
+  // Contratos de motos compradas antes de 20/08/2026 (não geram aviso de assinatura)
+  const [contratosLegado, setContratosLegado] = useState<Set<string>>(new Set());
 
   // signing dialog
   const [activeContrato, setActiveContrato] = useState<Contrato | null>(null);
@@ -104,12 +109,12 @@ export default function ClienteDocumentosPage() {
     if (!user) return;
     setUserId(user.id);
 
-    const [perfilRes, contratosRes, certificadosRes, garantiasRes] =
+    const [perfilRes, contratosRes, certificadosRes, garantiasRes, scootersRes] =
       await Promise.all([
         supabase.from("profiles").select("nome").eq("id", user.id).maybeSingle(),
         supabase
           .from("contratos")
-          .select("id, tipo, titulo, status, conteudo, pdf_url, created_at")
+          .select("id, tipo, titulo, status, conteudo, pdf_url, scooter_id, assinado_presencial, created_at")
           .eq("cliente_id", user.id)
           .order("created_at", { ascending: false }),
         supabase
@@ -124,10 +129,28 @@ export default function ClienteDocumentosPage() {
           )
           .eq("cliente_id", user.id)
           .order("created_at", { ascending: false }),
+        supabase
+          .from("scooters")
+          .select("id, data_compra, legado")
+          .eq("cliente_id", user.id),
       ]);
 
     const nome = (perfilRes.data as { nome?: string } | null)?.nome ?? "";
     setUserNome(nome);
+
+    // Motos compradas antes de 20/08/2026: contratos delas não geram aviso de assinatura.
+    const motos = (scootersRes.data ?? []) as { id: string; data_compra: string | null; legado: boolean }[];
+    const legadoIds = new Set(motos.filter((m) => isClienteLegado(m.data_compra, m.legado)).map((m) => m.id));
+    const soLegado = motos.length > 0 && legadoIds.size === motos.length;
+    const listaContratos = (contratosRes.data ?? []) as unknown as Contrato[];
+    setContratosLegado(
+      new Set(
+        listaContratos
+          .filter((c) => (c.scooter_id ? legadoIds.has(c.scooter_id) : soLegado))
+          .map((c) => c.id)
+      )
+    );
+
     if (contratosRes.data) setContratos(contratosRes.data as unknown as Contrato[]);
     if (certificadosRes.data) setCertificados(certificadosRes.data as unknown as Certificado[]);
     if (garantiasRes.data) setGarantias(garantiasRes.data as unknown as Garantia[]);
@@ -195,7 +218,9 @@ export default function ClienteDocumentosPage() {
   }
 
   const pendentes = contratos.filter(
-    (c) => c.status === "enviado" || c.status === "visualizado"
+    (c) =>
+      (c.status === "enviado" || c.status === "visualizado") &&
+      !contratosLegado.has(c.id)
   ).length;
 
   return (
@@ -247,8 +272,11 @@ export default function ClienteDocumentosPage() {
           ) : (
             contratos.map((c) => {
               const assinado = c.status === "assinado";
+              // Compra anterior a 20/08/2026: documento fica só para consulta,
+              // sem cobrança de assinatura.
+              const legado = contratosLegado.has(c.id);
               const podeAssinar =
-                c.status === "enviado" || c.status === "visualizado";
+                !legado && (c.status === "enviado" || c.status === "visualizado");
               return (
                 <Card key={c.id}>
                   <CardContent className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4">
@@ -260,9 +288,15 @@ export default function ClienteDocumentosPage() {
                           <span className="text-xs text-muted-foreground">
                             {CONTRATO_TIPO_LABELS[c.tipo] || c.tipo}
                           </span>
-                          <Badge className={STATUS_COLORS[c.status]}>
-                            {STATUS_LABELS[c.status] || c.status}
-                          </Badge>
+                          {c.assinado_presencial ? (
+                            <Badge className={STATUS_COLORS.assinado}>
+                              Assinado presencialmente
+                            </Badge>
+                          ) : (!legado || assinado) && (
+                            <Badge className={STATUS_COLORS[c.status]}>
+                              {STATUS_LABELS[c.status] || c.status}
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -420,11 +454,25 @@ export default function ClienteDocumentosPage() {
             }}
           />
 
-          {activeContrato?.status === "assinado" ? (
+          {activeContrato?.assinado_presencial ? (
+            <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
+              <span>
+                <strong>Assinado de forma presencial.</strong> A via assinada em papel
+                está com a loja — não é necessário assinar novamente por aqui.
+              </span>
+            </div>
+          ) : activeContrato?.status === "assinado" ? (
             <div className="flex items-center gap-2 text-emerald-700 text-sm">
               <CheckCircle2 className="h-5 w-5" />
               Documento já assinado.
             </div>
+          ) : activeContrato && contratosLegado.has(activeContrato.id) ? (
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setActiveContrato(null)}>
+                Fechar
+              </Button>
+            </DialogFooter>
           ) : (
             <div className="space-y-3">
               <div className="space-y-1.5">

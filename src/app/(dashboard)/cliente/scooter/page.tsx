@@ -11,7 +11,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Bike, ShieldCheck, MapPin, Calendar, Hash, Battery, Cpu, Cog, CalendarClock, Gift } from "lucide-react";
-import { GARANTIA_MODALIDADE_LABEL } from "@/lib/constants";
+import { GARANTIA_MODALIDADE_LABEL, isClienteLegado } from "@/lib/constants";
 
 interface ScooterFull {
   id: string;
@@ -22,6 +22,7 @@ interface ScooterFull {
   chassi: string;
   numero_serie: string;
   data_compra: string;
+  legado: boolean;
 }
 
 interface GarantiaInfo {
@@ -112,6 +113,8 @@ export default function ClienteScooterPage() {
   if (!scooter) return <p className="text-center py-12 text-muted-foreground">Scooter não encontrada</p>;
 
   const garantiaAtiva = garantia?.status === "ativa";
+  // Compra anterior a 20/08/2026: sem agenda de revisões e sem preventiva gratuita.
+  const legado = isClienteLegado(scooter.data_compra, scooter.legado);
   const diasRestantes = garantia?.data_fim
     ? Math.max(0, Math.ceil((new Date(garantia.data_fim).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : 0;
@@ -220,7 +223,16 @@ export default function ClienteScooterPage() {
                   </p>
                 </div>
 
-                {preventivas.length > 0 && (
+                {legado && (
+                  <>
+                    <Separator />
+                    <Button className="w-full" render={<Link href="/cliente/ordens?nova=true" />}>
+                      <Calendar className="h-4 w-4 mr-2" /> Agendar entrega da moto
+                    </Button>
+                  </>
+                )}
+
+                {!legado && preventivas.length > 0 && (
                   <>
                     <Separator />
                     <div>

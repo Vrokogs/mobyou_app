@@ -135,6 +135,31 @@ export const GARANTIA_MODALIDADE_LABEL: Record<string, string> = {
   '3_meses': '3 meses',
 };
 
+// ---------------------------------------------------------------------------
+// Clientes legados (compraram antes do sistema entrar no ar)
+// Uma moto é legada quando está marcada com scooters.legado OU quando a data de
+// compra é anterior a 20/08/2026. Nesses casos o cliente:
+//   - não recebe aviso para assinar contrato (nem bloqueio por contrato pendente)
+//   - não tem manutenção preventiva gratuita nem avisos/agenda de revisões
+//   - continua com acesso normal ao app (pode agendar suas manutenções)
+// Vendas novas (sem o marcador e a partir de 20/08/2026) seguem as regras normais.
+//
+// O marcador existe porque a data de compra nem sempre é confiável: no formulário
+// de importação ela vem preenchida com a data de hoje, então uma NF antiga
+// importada sem ajuste ficaria classificada como venda nova.
+// ---------------------------------------------------------------------------
+export const DATA_CORTE_LEGADO = '2026-08-20';
+
+// dataCompra: ISO "YYYY-MM-DD" ou timestamp. Sem data e sem marcador => venda nova.
+export function isClienteLegado(
+  dataCompra?: string | null,
+  legado?: boolean | null,
+): boolean {
+  if (legado) return true;
+  if (!dataCompra) return false;
+  return dataCompra.slice(0, 10) < DATA_CORTE_LEGADO;
+}
+
 // Manutenção preventiva/revisão a cada 90 dias (3 em 3 meses)
 export const PREVENTIVA_INTERVALO_DIAS = 90;
 export const PREVENTIVA_VALOR = 300; // R$ 300 por revisão (1ª grátis, exceto Bibi)
@@ -220,6 +245,18 @@ export const CONTRATO_TIPOS: Record<ContratoTipo, string> = {
   entrega: 'Entrega',
   desbloqueio: 'Desbloqueio',
   personalizado: 'Personalizado',
+};
+
+// Opções do filtro de status na listagem de contratos.
+// "ativos" agrupa o que ainda depende de alguém (rascunho/enviado/visualizado).
+export const CONTRATO_STATUS_FILTROS: Record<string, string> = {
+  ativos: 'Ativos (pendentes)',
+  todos: 'Todos os status',
+  rascunho: 'Rascunho',
+  enviado: 'Aguardando assinatura',
+  visualizado: 'Visualizado',
+  assinado: 'Assinado',
+  cancelado: 'Cancelado',
 };
 
 export const CONTRATO_STATUS: Record<ContratoStatus, string> = {

@@ -272,7 +272,16 @@ export default function ContratoDetailPage() {
               <CardTitle className="text-lg">Assinaturas</CardTitle>
             </CardHeader>
             <CardContent>
-              {assinaturas.length === 0 ? (
+              {contrato.assinado_presencial ? (
+                <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
+                  <span>
+                    <strong>Assinado de forma presencial.</strong> A assinatura foi
+                    colhida em papel, então não há registro eletrônico (data, IP e
+                    hash) neste contrato.
+                  </span>
+                </div>
+              ) : assinaturas.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-6">
                   Nenhuma assinatura registrada.
                 </p>

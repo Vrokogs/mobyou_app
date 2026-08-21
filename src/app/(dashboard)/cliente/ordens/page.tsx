@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { Plus, ChevronRight, Wrench, AlertTriangle, FileWarning, Info, MapPin, ShieldCheck, CheckCircle2 } from "lucide-react";
 import {
   LOCAIS_ATENDIMENTO, proximasDatasLocal, horariosLocal, MENSAGEM_A_COMBINAR, TIPOS_SOLICITACAO,
-  PREVENTIVA_VALOR, PREVENTIVA_INTERVALO_DIAS, preventivaSemprePaga,
+  PREVENTIVA_VALOR, PREVENTIVA_INTERVALO_DIAS, preventivaSemprePaga, isClienteLegado,
 } from "@/lib/constants";
 
 interface Ordem {
@@ -32,6 +32,8 @@ interface Scooter {
   id: string;
   modelo: string;
   chassi: string;
+  data_compra: string | null;
+  legado: boolean;
   modalidade?: string | null;
 }
 
@@ -58,6 +60,8 @@ export default function ClienteOrdensPage() {
   const scooterSel = scooters.find((s) => s.id === form.scooter_id);
   // 3 meses (inclui Bibi): revisão sempre paga e sugestiva. 6m/1a: 1ª grátis + obrigatória.
   const pagaSugestiva = preventivaSemprePaga(scooterSel?.modalidade, scooterSel?.modelo);
+  // Compra anterior a 20/08/2026: sem preventiva gratuita e sem avisos de revisão.
+  const legadoSel = isClienteLegado(scooterSel?.data_compra, scooterSel?.legado);
   const searchParams = useSearchParams();
 
   useEffect(() => {
@@ -78,11 +82,12 @@ export default function ClienteOrdensPage() {
       supabase.from("ordens_servico")
         .select("id, numero, status, created_at, scooter:scooters!ordens_servico_scooter_id_fkey(id, modelo)")
         .eq("cliente_id", user.id).order("created_at", { ascending: false }),
-      supabase.from("scooters").select("id, modelo, chassi").eq("cliente_id", user.id),
-      supabase.from("contratos").select("id, status").eq("cliente_id", user.id).neq("status", "assinado"),
+      supabase.from("scooters").select("id, modelo, chassi, data_compra, legado").eq("cliente_id", user.id),
+      supabase.from("contratos").select("id, status, scooter_id").eq("cliente_id", user.id).neq("status", "assinado"),
     ]);
 
     if (ordensRes.data) setOrdens(ordensRes.data as unknown as Ordem[]);
+    const listaScooters = (scootersRes.data ?? []) as unknown as Scooter[];
     if (scootersRes.data) {
       const ids = scootersRes.data.map((s) => s.id);
       const { data: garantias } = await supabase
@@ -92,7 +97,14 @@ export default function ClienteOrdensPage() {
       const modByScooter = new Map((garantias ?? []).map((g: any) => [g.scooter_id, g.modalidade]));
       setScooters(scootersRes.data.map((s) => ({ ...s, modalidade: modByScooter.get(s.id) ?? null })) as unknown as Scooter[]);
     }
-    setContratosPendentes((contratosRes.data ?? []).length);
+
+    // Motos compradas antes de 20/08/2026 não geram aviso/bloqueio de contrato.
+    const legadoIds = new Set(listaScooters.filter((s) => isClienteLegado(s.data_compra, s.legado)).map((s) => s.id));
+    const soLegado = listaScooters.length > 0 && legadoIds.size === listaScooters.length;
+    const pendentes = ((contratosRes.data ?? []) as { scooter_id: string | null }[]).filter((c) =>
+      c.scooter_id ? !legadoIds.has(c.scooter_id) : !soLegado
+    );
+    setContratosPendentes(pendentes.length);
     setLoading(false);
   }
 
@@ -194,8 +206,9 @@ export default function ClienteOrdensPage() {
                 </Select>
               </div>
 
-              {/* Aviso da manutenção preventiva (varia conforme a garantia da moto) */}
-              {form.tipo === "preventiva" && (
+              {/* Aviso da manutenção preventiva (varia conforme a garantia da moto).
+                  Compras anteriores a 20/08/2026 não recebem aviso de revisão. */}
+              {form.tipo === "preventiva" && !legadoSel && (
                 pagaSugestiva ? (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 flex items-start gap-2 text-sm">
                     <ShieldCheck className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
@@ -297,17 +310,24 @@ export default function ClienteOrdensPage() {
               {/* Mensagem de ciência */}
               <div className="rounded-lg border bg-muted/40 p-3 flex items-start gap-2 text-xs text-muted-foreground">
                 <CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                <p>
-                  Ao solicitar, você declara estar <strong>ciente</strong> de que{" "}
-                  {pagaSugestiva ? (
-                    <>para esta moto (garantia de 3 meses) a revisão é <strong>sugestiva</strong> e{" "}
-                    <strong>todas as manutenções preventivas são pagas</strong> (R$ {PREVENTIVA_VALOR},00 por revisão)</>
-                  ) : (
-                    <>a <strong>1ª manutenção preventiva é gratuita</strong> e as demais têm o valor de{" "}
-                    <strong>R$ {PREVENTIVA_VALOR},00</strong> por revisão</>
-                  )}
-                  . Nossa equipe entrará em contato para confirmar os detalhes do atendimento.
-                </p>
+                {legadoSel ? (
+                  <p>
+                    Nossa equipe entrará em contato para confirmar os detalhes do atendimento e
+                    informar o valor do serviço.
+                  </p>
+                ) : (
+                  <p>
+                    Ao solicitar, você declara estar <strong>ciente</strong> de que{" "}
+                    {pagaSugestiva ? (
+                      <>para esta moto (garantia de 3 meses) a revisão é <strong>sugestiva</strong> e{" "}
+                      <strong>todas as manutenções preventivas são pagas</strong> (R$ {PREVENTIVA_VALOR},00 por revisão)</>
+                    ) : (
+                      <>a <strong>1ª manutenção preventiva é gratuita</strong> e as demais têm o valor de{" "}
+                      <strong>R$ {PREVENTIVA_VALOR},00</strong> por revisão</>
+                    )}
+                    . Nossa equipe entrará em contato para confirmar os detalhes do atendimento.
+                  </p>
+                )}
               </div>
 
               <Button type="submit" className="w-full" disabled={saving}>

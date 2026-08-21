@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, Search, Send, Eye, FileText } from "lucide-react";
 import { toast } from "sonner";
-import { CONTRATO_TIPOS, CONTRATO_STATUS } from "@/lib/constants";
+import { CONTRATO_TIPOS, CONTRATO_STATUS, CONTRATO_STATUS_FILTROS } from "@/lib/constants";
 import type { Contrato, ContratoTipo, ContratoStatus, ModeloContrato, Profile, Scooter } from "@/types/database";
 
 interface ContratoWithRelations extends Contrato {
@@ -44,6 +44,7 @@ export default function VendedorContratosPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [tipoFilter, setTipoFilter] = useState<string>("todos");
+  const [statusFilter, setStatusFilter] = useState<string>("ativos");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -74,6 +75,13 @@ export default function VendedorContratosPage() {
       query = query.eq("tipo", tipoFilter as any);
     }
 
+    // "ativos" = tudo que ainda está em jogo (esconde cancelados e assinados)
+    if (statusFilter === "ativos") {
+      query = query.in("status", ["rascunho", "enviado", "visualizado"]);
+    } else if (statusFilter !== "todos") {
+      query = query.eq("status", statusFilter as any);
+    }
+
     if (search.trim()) {
       query = query.ilike("titulo", `%${search}%`);
     }
@@ -92,7 +100,7 @@ export default function VendedorContratosPage() {
     setClientes((clientesRes.data ?? []) as Profile[]);
     setScooters((scootersRes.data ?? []) as Scooter[]);
     setLoading(false);
-  }, [tipoFilter, search]);
+  }, [tipoFilter, statusFilter, search]);
 
   useEffect(() => {
     loadData();
@@ -275,6 +283,20 @@ export default function VendedorContratosPage() {
             <TabsTrigger value="personalizado">Personalizado</TabsTrigger>
           </TabsList>
         </Tabs>
+        <Select
+          items={CONTRATO_STATUS_FILTROS}
+          value={statusFilter}
+          onValueChange={(v: string | null) => setStatusFilter(v ?? "ativos")}
+        >
+          <SelectTrigger className="w-52 shrink-0">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            {Object.entries(CONTRATO_STATUS_FILTROS).map(([key, label]) => (
+              <SelectItem key={key} value={key}>{label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <Card>
@@ -287,7 +309,9 @@ export default function VendedorContratosPage() {
         <CardContent>
           {contratos.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
-              Nenhum contrato encontrado.
+              {statusFilter === "ativos"
+                ? "Nenhum contrato pendente. Troque o filtro de status para ver os assinados e cancelados."
+                : "Nenhum contrato encontrado."}
             </p>
           ) : (
             <Table>
@@ -316,7 +340,9 @@ export default function VendedorContratosPage() {
                         variant="secondary"
                         className={STATUS_COLORS[contrato.status] ?? ""}
                       >
-                        {CONTRATO_STATUS[contrato.status] ?? contrato.status}
+                        {contrato.assinado_presencial
+                          ? "Assinado presencialmente"
+                          : CONTRATO_STATUS[contrato.status] ?? contrato.status}
                       </Badge>
                     </TableCell>
                     <TableCell>{formatDate(contrato.created_at)}</TableCell>

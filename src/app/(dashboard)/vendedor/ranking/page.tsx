@@ -1,2 +1,8 @@
-// Ranking liberado a todos os vendedores — reaproveita a mesma tela do gestor.
-export { default } from "../../gestor/ranking/page";
+"use client";
+
+import { RankingVendas } from "@/components/ranking/ranking-vendas";
+
+// Ranking liberado a todos os vendedores, mas sem o faturamento da empresa.
+export default function VendedorRankingPage() {
+  return <RankingVendas podeVerFaturamento={false} />;
+}

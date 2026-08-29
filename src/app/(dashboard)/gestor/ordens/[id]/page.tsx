@@ -524,46 +524,51 @@ export default function OrdemDetalhePage() {
     e: React.ChangeEvent<HTMLInputElement>,
     tipo: string
   ) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const arquivos = Array.from(e.target.files ?? []);
+    if (arquivos.length === 0) return;
 
     setUploadingPhoto(true);
     try {
       const supabase = createClient();
-      const ext = file.name.split(".").pop();
-      const filePath = `ordens/${orderId}/${Date.now()}.${ext}`;
+      let enviadas = 0;
 
-      const { error: uploadError } = await supabase.storage
-        .from("fotos")
-        .upload(filePath, file);
+      for (const file of arquivos) {
+        const ext = file.name.split(".").pop() || "jpg";
+        const filePath = `ordens/${orderId}/${Date.now()}_${enviadas}.${ext}`;
 
-      if (uploadError) throw uploadError;
+        const { error: uploadError } = await supabase.storage
+          .from("fotos")
+          .upload(filePath, file);
+        if (uploadError) continue;
 
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("fotos").getPublicUrl(filePath);
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from("fotos").getPublicUrl(filePath);
 
-      const { error: insertError } = await (supabase
-        .from("fotos_ordem") as any)
-        .insert({
-          ordem_id: orderId,
-          tipo,
-          url: publicUrl,
-          storage_path: filePath,
-        });
+        const { error: insertError } = await (supabase
+          .from("fotos_ordem") as any)
+          .insert({
+            ordem_id: orderId,
+            tipo,
+            url: publicUrl,
+            storage_path: filePath,
+          });
+        if (insertError) continue;
+        enviadas++;
+      }
 
-      if (insertError) throw insertError;
+      if (enviadas === 0) throw new Error("nenhuma foto enviada");
 
       const { data: { user } } = await supabase.auth.getUser();
       await (supabase.from("timeline_eventos") as any).insert({
         ordem_id: orderId,
         responsavel_id: user?.id || null,
         tipo: "foto",
-        titulo: "Foto adicionada",
-        descricao: `Foto do tipo "${FOTO_TIPOS.find((t) => t.value === tipo)?.label ?? tipo}" adicionada`,
+        titulo: enviadas === 1 ? "Foto adicionada" : `${enviadas} fotos adicionadas`,
+        descricao: `Etapa "${FOTO_TIPOS.find((t) => t.value === tipo)?.label ?? tipo}"`,
       });
 
-      toast.success("Foto enviada com sucesso");
+      toast.success("Foto(s) enviada(s) com sucesso");
       await fetchRelatedData();
       fetchTimeline();
     } catch (err) {
@@ -919,6 +924,7 @@ export default function OrdemDetalhePage() {
                               <input
                                 type="file"
                                 accept="image/*"
+                                multiple
                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                 onChange={(e) => handlePhotoUpload(e, t.value)}
                                 disabled={uploadingPhoto}
@@ -933,10 +939,25 @@ export default function OrdemDetalhePage() {
                                 ) : (
                                   <Upload className="h-3 w-3 mr-1" />
                                 )}
-                                {etapa.tipos.length > 1 ? t.label : "Enviar foto"}
+                                {etapa.tipos.length > 1 ? t.label : "Enviar fotos"}
                               </Button>
                             </div>
                           ))}
+                          {/* Câmera direta — no celular abre a câmera traseira */}
+                          <div className="relative">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              multiple
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                              onChange={(e) => handlePhotoUpload(e, etapa.tipos[0].value)}
+                              disabled={uploadingPhoto}
+                            />
+                            <Button variant="outline" size="xs" disabled={uploadingPhoto}>
+                              <Camera className="h-3 w-3 mr-1" /> Câmera
+                            </Button>
+                          </div>
                         </div>
                       )}
                     </div>

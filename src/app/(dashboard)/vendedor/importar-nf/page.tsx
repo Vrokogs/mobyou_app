@@ -486,6 +486,8 @@ export default function VendedorImportarNFPage() {
           vendedor_id: vendedorFinal,
           cliente_id: clienteId,
           scooter_id: scooterId,
+          // Competência: a venda conta no mês da compra, não no do cadastro.
+          data_venda: dataInicio,
           nota_fiscal_id: notaFiscalId,
           valor_total: itemValor,
           entrada: 0,

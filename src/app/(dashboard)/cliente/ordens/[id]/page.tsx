@@ -11,7 +11,7 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import {
   ArrowLeft, CheckCircle, Circle, Clock, DollarSign, Image as ImageIcon,
-  User, Bike, Wrench, FileText,
+  User, Bike, Wrench, FileText, ShieldCheck,
 } from "lucide-react";
 
 interface OrdemDetail {
@@ -35,6 +35,35 @@ interface TimelineEvento {
   foto_url: string | null;
   created_at: string;
   responsavel: { nome: string } | null;
+}
+
+// Linha do orçamento vista pelo cliente. Item coberto pela garantia aparece
+// normalmente, com R$ 0,00 e o selo — o registro do que foi feito não se perde.
+function LinhaOrcamento({ item, rotulo }: { item: Record<string, unknown>; rotulo: string }) {
+  const emGarantia = item.garantia === true;
+  const qtd = num(item.quantidade ?? item.qtd);
+  const unit = num(item.valor_unitario ?? item.preco_unitario ?? item.valor ?? item.preco);
+  const total = num(item.valor_total) || (qtd > 0 ? unit * qtd : unit);
+  const nome = txt(item.descricao ?? item.nome) || rotulo;
+
+  return (
+    <div className="flex justify-between items-center gap-2 text-sm py-1">
+      <span className="flex items-center gap-1.5 min-w-0">
+        <span className="truncate">
+          {nome}
+          {qtd > 1 ? ` (x${qtd})` : ""}
+        </span>
+        {emGarantia && (
+          <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 gap-1 text-[10px] shrink-0">
+            <ShieldCheck className="h-3 w-3" /> Garantia
+          </Badge>
+        )}
+      </span>
+      <span className={emGarantia ? "text-emerald-700 font-medium shrink-0" : "shrink-0"}>
+        {emGarantia ? "R$ 0,00" : `R$ ${money(total)}`}
+      </span>
+    </div>
+  );
 }
 
 interface Orcamento {
@@ -276,31 +305,13 @@ export default function ClienteOrdemDetailPage() {
             {orcamento.pecas && orcamento.pecas.length > 0 && (
               <div>
                 <h4 className="font-medium text-sm mb-2">Peças</h4>
-                {orcamento.pecas.map((p, i) => {
-                  const qtd = num(p.quantidade ?? p.qtd);
-                  const unit = num(p.preco_unitario ?? p.valor ?? p.preco);
-                  const total = qtd > 0 ? unit * qtd : unit;
-                  return (
-                    <div key={i} className="flex justify-between text-sm py-1">
-                      <span>
-                        {txt(p.nome ?? p.descricao) || "Peça"}
-                        {qtd > 0 ? ` (x${qtd})` : ""}
-                      </span>
-                      <span>R$ {money(total)}</span>
-                    </div>
-                  );
-                })}
+                {orcamento.pecas.map((p, i) => <LinhaOrcamento key={i} item={p} rotulo="Peça" />)}
               </div>
             )}
             {orcamento.servicos && orcamento.servicos.length > 0 && (
               <div>
-                <h4 className="font-medium text-sm mb-2">Serviços</h4>
-                {orcamento.servicos.map((s, i) => (
-                  <div key={i} className="flex justify-between text-sm py-1">
-                    <span>{txt(s.descricao ?? s.nome) || "Serviço"}</span>
-                    <span>R$ {money(s.preco ?? s.valor)}</span>
-                  </div>
-                ))}
+                <h4 className="font-medium text-sm mb-2">Serviços e mão de obra</h4>
+                {orcamento.servicos.map((sv, i) => <LinhaOrcamento key={i} item={sv} rotulo="Serviço" />)}
               </div>
             )}
             <Separator />

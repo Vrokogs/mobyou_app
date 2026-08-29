@@ -18,6 +18,7 @@ interface Venda {
   valor_total: number | null;
   vendedor_id: string;
   unidade_negocio: string | null;
+  data_venda: string | null;
   created_at: string;
   vendedor: { nome: string } | null;
 }
@@ -40,6 +41,9 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
   const [loading, setLoading] = useState(true);
   const now = new Date();
   const [periodo, setPeriodo] = useState<string>(`${now.getFullYear()}-${now.getMonth()}`);
+  // Competência: a venda pertence ao mês em que aconteceu (data_venda), não ao
+  // mês em que foi cadastrada. Nota antiga importada hoje entra no mês certo.
+  const competencia = (v: Venda) => (v.data_venda ?? v.created_at).slice(0, 10);
 
   useEffect(() => {
     async function load() {
@@ -57,8 +61,10 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
 
   const [ano, mes] = periodo.split("-").map(Number);
   const doPeriodo = vendas.filter((v) => {
-    const d = new Date(v.created_at);
-    return d.getFullYear() === ano && (mes === -1 || d.getMonth() === mes);
+    const iso = competencia(v);
+    const a = Number(iso.slice(0, 4));
+    const m = Number(iso.slice(5, 7)) - 1;
+    return a === ano && (mes === -1 || m === mes);
   });
 
   // Separa varejo x atacado
@@ -94,11 +100,20 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
   });
   const maxUnidade = Math.max(1, ...porUnidade.map((u) => u.total));
 
-  // opções de período: cada mês do ano corrente + "ano todo"
-  const opcoes = [
-    { value: `${now.getFullYear()}--1`, label: `Ano ${now.getFullYear()} (todo)` },
-    ...MESES.map((m, i) => ({ value: `${now.getFullYear()}-${i}`, label: `${m}/${now.getFullYear()}` })),
-  ];
+  // Opções: os últimos 12 meses (mais recente primeiro) e o fechamento de cada
+  // ano com venda registrada. Permite comparar 3, 6 ou 12 meses para trás.
+  const opcoes: { value: string; label: string }[] = [];
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    opcoes.push({
+      value: `${d.getFullYear()}-${d.getMonth()}`,
+      label: `${MESES[d.getMonth()]}/${d.getFullYear()}${i === 0 ? " (atual)" : ""}`,
+    });
+  }
+  const anosComVenda = Array.from(new Set(vendas.map((v) => Number(competencia(v).slice(0, 4)))))
+    .filter((a) => !Number.isNaN(a))
+    .sort((a, b) => b - a);
+  for (const a of anosComVenda) opcoes.push({ value: `${a}--1`, label: `Ano ${a} (fechamento)` });
 
   const periodoLabel = opcoes.find((op) => op.value === periodo)?.label ?? "";
 
@@ -119,7 +134,7 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
             <Trophy className="h-6 w-6 text-yellow-500" /> Ranking & Competição
           </h1>
-          <p className="text-muted-foreground text-sm">Varejo (por vendedor) e Atacado (Julia + Robert, 50/50)</p>
+          <p className="text-muted-foreground text-sm">Por competência mensal — a venda conta no mês em que foi feita. Varejo por vendedor e Atacado 50/50.</p>
         </div>
         <Select items={Object.fromEntries(opcoes.map((o) => [o.value, o.label]))} value={periodo} onValueChange={(v) => v && setPeriodo(v)}>
           <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
@@ -137,7 +152,8 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
             </p>
             <p className="text-2xl font-bold mt-1 text-primary">{brl(totalGeral)}</p>
             <p className="text-[11px] text-muted-foreground mt-0.5">
-              Todas as vendas do período. Ao virar o mês, a tela abre já no mês novo.
+              Por competência: cada venda conta no mês em que aconteceu, não no mês
+              em que foi cadastrada.
             </p>
           </CardContent></Card>
         )}

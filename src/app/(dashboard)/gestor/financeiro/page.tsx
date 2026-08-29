@@ -55,12 +55,13 @@ export default function FinanceiroPage() {
     const startDate = new Date(year, month - 1, 1).toISOString().slice(0, 10);
     const endDate = new Date(year, month, 0).toISOString().slice(0, 10);
 
+    // Competência: filtra pela data real da venda, não pela do cadastro.
     const { data: vendasData } = await supabase
       .from("vendas")
       .select("*, cliente:profiles!vendas_cliente_id_fkey(nome), vendedor:profiles!vendas_vendedor_id_fkey(nome)")
-      .gte("created_at", `${startDate}T00:00:00`)
-      .lte("created_at", `${endDate}T23:59:59`)
-      .order("created_at", { ascending: false });
+      .gte("data_venda", startDate)
+      .lte("data_venda", endDate)
+      .order("data_venda", { ascending: false });
 
     setVendas((vendasData ?? []) as unknown as VendaRow[]);
 
@@ -79,13 +80,14 @@ export default function FinanceiroPage() {
     const yearEnd = `${year}-12-31`;
 
     const [yearVendas, yearOrc] = await Promise.all([
-      supabase.from("vendas").select("valor_total, created_at").gte("created_at", `${yearStart}T00:00:00`).lte("created_at", `${yearEnd}T23:59:59`),
+      supabase.from("vendas").select("valor_total, data_venda").gte("data_venda", yearStart).lte("data_venda", yearEnd),
       supabase.from("orcamentos").select("valor_total, created_at").gte("created_at", `${yearStart}T00:00:00`).lte("created_at", `${yearEnd}T23:59:59`),
     ]);
 
     const monthTotals: Record<number, number> = {};
-    (yearVendas.data ?? []).forEach((v: { valor_total: number | null; created_at: string }) => {
-      const m = new Date(v.created_at).getMonth();
+    (yearVendas.data ?? []).forEach((v: { valor_total: number | null; data_venda: string | null }) => {
+      if (!v.data_venda) return;
+      const m = Number(v.data_venda.slice(5, 7)) - 1;
       monthTotals[m] = (monthTotals[m] || 0) + (v.valor_total || 0);
     });
     (yearOrc.data ?? []).forEach((o: { valor_total: number | null; created_at: string }) => {

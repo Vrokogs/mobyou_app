@@ -321,6 +321,8 @@ export type Venda = {
   lead_id: string | null;
   chassi: string | null;
   unidade_negocio: string | null;
+  // Data real da venda (competência). created_at é a data do cadastro.
+  data_venda: string | null;
   created_at: string;
 };
 
@@ -517,6 +519,8 @@ export type OrcamentoItem = {
   valor_unitario: number;
   valor_total: number;
   tipo: 'peca' | 'servico';
+  // Coberto pela garantia: aparece no orçamento e no histórico, mas não é cobrado.
+  garantia?: boolean;
 };
 
 export type EstoqueInsert = Omit<Estoque, 'id' | 'created_at' | 'updated_at'> & {

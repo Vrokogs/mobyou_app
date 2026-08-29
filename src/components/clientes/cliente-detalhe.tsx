@@ -43,7 +43,8 @@ import {
   FolderOpen,
   FilePlus2,
   Loader2,
-} from "lucide-react";
+
+  KeyRound,} from "lucide-react";
 import { useForm } from "react-hook-form";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -83,6 +84,11 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [generatingDocs, setGeneratingDocs] = useState(false);
+  // Acesso do cliente: corrigir e-mail de login (e, se quiser, a senha)
+  const [acessoOpen, setAcessoOpen] = useState(false);
+  const [novoEmail, setNovoEmail] = useState("");
+  const [novaSenha, setNovaSenha] = useState("");
+  const [salvandoAcesso, setSalvandoAcesso] = useState(false);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<EditFormData>();
 
@@ -158,6 +164,31 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
     toast.success("Dados do cliente atualizados.");
     setEditOpen(false);
     loadData();
+  }
+
+  async function salvarAcesso() {
+    const email = novoEmail.trim();
+    if (!email) { toast.error("Informe o novo e-mail."); return; }
+    setSalvandoAcesso(true);
+    try {
+      const res = await fetch("/api/alterar-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cliente_id: clienteId, email, senha: novaSenha.trim() || undefined }),
+      });
+      const json = await res.json();
+      if (!res.ok) { toast.error("Erro ao alterar acesso", { description: json.error }); return; }
+      toast.success("E-mail de acesso atualizado.", {
+        description: json.senhaAlterada ? "A senha também foi redefinida." : `O cliente agora entra com ${email}.`,
+      });
+      setAcessoOpen(false);
+      setNovaSenha("");
+      loadData();
+    } catch {
+      toast.error("Erro inesperado ao alterar o acesso.");
+    } finally {
+      setSalvandoAcesso(false);
+    }
   }
 
   function aplicarVariaveis(template: string, scooter: Scooter | null) {
@@ -292,6 +323,60 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
                 <User className="h-5 w-5" />
                 Dados do Cliente
               </CardTitle>
+              <div className="flex items-center gap-2">
+              {podeEditar && (
+                <Dialog open={acessoOpen} onOpenChange={(v) => { setAcessoOpen(v); if (v) setNovoEmail(cliente.email ?? ""); }}>
+                  <DialogTrigger
+                    render={
+                      <Button variant="outline" size="sm">
+                        <KeyRound className="h-3 w-3 mr-1" />
+                        Acesso
+                      </Button>
+                    }
+                  />
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Acesso do cliente</DialogTitle>
+                      <DialogDescription>
+                        Corrija o e-mail de login se ele foi cadastrado errado. O cliente passa a
+                        entrar com o novo endereço imediatamente.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="space-y-1.5">
+                        <Label>E-mail de acesso</Label>
+                        <Input
+                          type="email"
+                          value={novoEmail}
+                          onChange={(e) => setNovoEmail(e.target.value)}
+                          placeholder="nome@dominio.com"
+                        />
+                        <p className="text-[11px] text-muted-foreground">
+                          Atual: {cliente.email || "—"}
+                        </p>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Nova senha (opcional)</Label>
+                        <Input
+                          type="text"
+                          value={novaSenha}
+                          onChange={(e) => setNovaSenha(e.target.value)}
+                          placeholder="deixe em branco para manter a atual"
+                        />
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setAcessoOpen(false)} disabled={salvandoAcesso}>
+                          Cancelar
+                        </Button>
+                        <Button onClick={salvarAcesso} disabled={salvandoAcesso}>
+                          {salvandoAcesso && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
+                          Salvar acesso
+                        </Button>
+                      </DialogFooter>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
               <Dialog open={editOpen} onOpenChange={setEditOpen}>
                 {podeEditar && (
                   <DialogTrigger
@@ -341,6 +426,7 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
                   </form>
                 </DialogContent>
               </Dialog>
+              </div>
             </div>
           </CardHeader>
           <CardContent>

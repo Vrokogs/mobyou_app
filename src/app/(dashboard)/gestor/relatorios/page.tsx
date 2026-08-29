@@ -13,7 +13,7 @@ import { UNIDADES_NEGOCIO } from "@/lib/constants";
 const brl = (n: number) => "R$ " + n.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
 const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
-interface Linha { valor_total: number | null; unidade_negocio?: string | null; created_at: string }
+interface Linha { valor_total: number | null; unidade_negocio?: string | null; data_venda?: string | null; created_at: string }
 
 export default function GestorRelatoriosPage() {
   const [vendas, setVendas] = useState<Linha[]>([]);
@@ -27,7 +27,7 @@ export default function GestorRelatoriosPage() {
     async function load() {
       const supabase = createClient();
       const [v, o, p] = await Promise.all([
-        supabase.from("vendas").select("valor_total, unidade_negocio, created_at"),
+        supabase.from("vendas").select("valor_total, unidade_negocio, data_venda, created_at"),
         supabase.from("ordens_servico").select("valor_total, created_at"),
         supabase.from("vendas_pecas").select("valor_total, created_at"),
       ]);
@@ -47,7 +47,8 @@ export default function GestorRelatoriosPage() {
   const soma = (arr: Linha[]) => arr.filter((x) => noPeriodo(x.created_at)).reduce((s, x) => s + (x.valor_total ?? 0), 0);
   const qtd = (arr: Linha[]) => arr.filter((x) => noPeriodo(x.created_at)).length;
 
-  const vendasPeriodo = vendas.filter((v) => noPeriodo(v.created_at));
+  // Venda entra pela competência (data real), serviço e peça pela data do registro.
+  const vendasPeriodo = vendas.filter((v) => noPeriodo(v.data_venda ?? v.created_at));
   const varejo = vendasPeriodo.filter((v) => (v.unidade_negocio ?? "varejo") === "varejo");
   const atacado = vendasPeriodo.filter((v) => v.unidade_negocio === "atacado");
 

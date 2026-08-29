@@ -315,33 +315,43 @@ export default function TecnicoOrdemDetailPage() {
   // Photo upload
   // -------------------------------------------------------------------------
 
+  // Envia uma ou várias fotos de uma vez. O input aceita seleção múltipla e,
+  // no celular, um segundo input abre a câmera direto.
   async function handlePhotoUpload(tipo: string, e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const arquivos = Array.from(e.target.files ?? []);
+    if (arquivos.length === 0) return;
 
     setUploadingFoto(tipo);
+    let enviadas = 0;
+    const falhas: string[] = [];
+
     try {
-      const path = `ordens/${orderId}/${tipo}_${Date.now()}.${file.name.split(".").pop()}`;
-      const { error } = await supabase.storage.from("fotos").upload(path, file);
-      if (error) throw error;
+      for (const file of arquivos) {
+        const ext = file.name.split(".").pop() || "jpg";
+        const path = `ordens/${orderId}/${tipo}_${Date.now()}_${enviadas}.${ext}`;
+        const { error } = await supabase.storage.from("fotos").upload(path, file);
+        if (error) { falhas.push(file.name); continue; }
 
-      const { data: { publicUrl } } = supabase.storage.from("fotos").getPublicUrl(path);
-      const { error: insertError } = await (supabase.from("fotos_ordem") as any).insert({
-        ordem_id: orderId,
-        tipo,
-        url: publicUrl,
-        storage_path: path,
-      });
+        const { data: { publicUrl } } = supabase.storage.from("fotos").getPublicUrl(path);
+        const { error: insertError } = await (supabase.from("fotos_ordem") as any).insert({
+          ordem_id: orderId,
+          tipo,
+          url: publicUrl,
+          storage_path: path,
+        });
+        if (insertError) { falhas.push(file.name); continue; }
+        enviadas++;
+      }
 
-      if (insertError) throw insertError;
-
-      toast.success(`Foto "${tipo}" enviada com sucesso`);
-      await loadFotos();
-    } catch {
-      toast.error("Erro ao enviar foto");
+      if (enviadas > 0) {
+        toast.success(enviadas === 1 ? "Foto enviada." : `${enviadas} fotos enviadas.`);
+        await loadFotos();
+      }
+      if (falhas.length > 0) {
+        toast.error(`${falhas.length} foto(s) não subiram`, { description: falhas.join(", ") });
+      }
     } finally {
       setUploadingFoto(null);
-      // Reset file input
       e.target.value = "";
     }
   }
@@ -897,32 +907,57 @@ export default function TecnicoOrdemDetailPage() {
                         </div>
                       ))}
 
-                      {/* Upload button */}
-                      <label
-                        className={`flex items-center justify-center gap-2 h-24 rounded-lg border-2 border-dashed cursor-pointer transition-colors ${
-                          isUploading
-                            ? "border-primary bg-primary/5"
-                            : "border-muted-foreground/25 hover:border-primary hover:bg-accent/50"
-                        }`}
-                      >
-                        {isUploading ? (
-                          <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                        ) : (
-                          <>
-                            <Upload className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm text-muted-foreground">
-                              {existing.length > 0 ? "Adicionar mais" : "Enviar foto"}
-                            </span>
-                          </>
-                        )}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          disabled={isUploading}
-                          onChange={(e) => handlePhotoUpload(ft.value, e)}
-                        />
-                      </label>
+                      {/* Envio: galeria (várias de uma vez) e câmera direta */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <label
+                          className={`flex flex-col items-center justify-center gap-1 h-24 rounded-lg border-2 border-dashed cursor-pointer transition-colors ${
+                            isUploading
+                              ? "border-primary bg-primary/5"
+                              : "border-muted-foreground/25 hover:border-primary hover:bg-accent/50"
+                          }`}
+                        >
+                          {isUploading ? (
+                            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                          ) : (
+                            <>
+                              <Upload className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-xs text-muted-foreground text-center px-1">
+                                {existing.length > 0 ? "Adicionar mais" : "Escolher fotos"}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground/70">várias de uma vez</span>
+                            </>
+                          )}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            className="hidden"
+                            disabled={isUploading}
+                            onChange={(e) => handlePhotoUpload(ft.value, e)}
+                          />
+                        </label>
+
+                        <label
+                          className={`flex flex-col items-center justify-center gap-1 h-24 rounded-lg border-2 border-dashed cursor-pointer transition-colors ${
+                            isUploading
+                              ? "border-primary bg-primary/5"
+                              : "border-muted-foreground/25 hover:border-primary hover:bg-accent/50"
+                          }`}
+                        >
+                          <Camera className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground text-center px-1">Tirar foto</span>
+                          <span className="text-[10px] text-muted-foreground/70">abre a câmera</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            multiple
+                            className="hidden"
+                            disabled={isUploading}
+                            onChange={(e) => handlePhotoUpload(ft.value, e)}
+                          />
+                        </label>
+                      </div>
                     </div>
                   );
                 })}

@@ -7,16 +7,26 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/client";
 import type { Orcamento, OrcamentoItem, Diagnostico } from "@/types/database";
-import { Plus, Trash2, Save, Loader2, Send } from "lucide-react";
+import { Plus, Trash2, Save, Loader2, Send, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
-interface PecaItem {
+interface LinhaItem {
   descricao: string;
   quantidade: number;
   valor_unitario: number;
+  // Em garantia: continua no orçamento e no histórico, mas com valor zerado.
+  garantia: boolean;
+}
+
+const LINHA_VAZIA: LinhaItem = { descricao: "", quantidade: 1, valor_unitario: 0, garantia: false };
+
+// Item em garantia não entra no total — o cliente não paga, mas o registro fica.
+function subtotal(i: LinhaItem): number {
+  return i.garantia ? 0 : i.quantidade * i.valor_unitario;
 }
 
 interface OrcamentoFormProps {
@@ -34,6 +44,125 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
+// Bloco reutilizável de linhas: serve tanto para peças quanto para serviços.
+// A marcação de garantia zera o valor da linha sem tirá-la do orçamento.
+function LinhasSecao({
+  titulo,
+  rotuloItem,
+  linhas,
+  subtotalLabel,
+  onAdd,
+  onRemove,
+  onUpdate,
+}: {
+  titulo: string;
+  rotuloItem: string;
+  linhas: LinhaItem[];
+  subtotalLabel: string;
+  onAdd: () => void;
+  onRemove: (i: number) => void;
+  onUpdate: (i: number, campo: keyof LinhaItem, valor: string | number | boolean) => void;
+}) {
+  const soma = linhas.reduce((acc, l) => acc + subtotal(l), 0);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-sm font-semibold">{titulo}</h4>
+        <Button variant="outline" size="xs" onClick={onAdd}>
+          <Plus className="h-3 w-3 mr-1" />
+          Adicionar
+        </Button>
+      </div>
+
+      <div className="space-y-2">
+        <div className="hidden sm:grid grid-cols-12 gap-2 px-1">
+          <div className="col-span-4 text-xs text-muted-foreground font-medium">Descrição</div>
+          <div className="col-span-1 text-xs text-muted-foreground font-medium">Qtd</div>
+          <div className="col-span-2 text-xs text-muted-foreground font-medium">Valor unit.</div>
+          <div className="col-span-2 text-xs text-muted-foreground font-medium">Garantia</div>
+          <div className="col-span-2 text-xs text-muted-foreground font-medium text-right">Subtotal</div>
+          <div className="col-span-1" />
+        </div>
+
+        {linhas.map((linha, index) => (
+          <div
+            key={index}
+            className={`grid grid-cols-1 sm:grid-cols-12 gap-2 items-center rounded-lg border p-2 ${
+              linha.garantia ? "border-emerald-300 bg-emerald-50/40" : ""
+            }`}
+          >
+            <div className="sm:col-span-4">
+              <Input
+                placeholder={rotuloItem}
+                value={linha.descricao}
+                onChange={(e) => onUpdate(index, "descricao", e.target.value)}
+                className="text-sm h-8"
+              />
+            </div>
+            <div className="sm:col-span-1">
+              <Input
+                type="number"
+                min={1}
+                value={linha.quantidade}
+                onChange={(e) => onUpdate(index, "quantidade", parseInt(e.target.value) || 1)}
+                className="text-sm h-8"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <Input
+                type="number"
+                min={0}
+                step={0.01}
+                value={linha.valor_unitario}
+                onChange={(e) => onUpdate(index, "valor_unitario", parseFloat(e.target.value) || 0)}
+                className="text-sm h-8"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+                <Checkbox
+                  checked={linha.garantia}
+                  onCheckedChange={(c) => onUpdate(index, "garantia", c === true)}
+                />
+                <span className={linha.garantia ? "text-emerald-700 font-medium" : "text-muted-foreground"}>
+                  Em garantia
+                </span>
+              </label>
+            </div>
+            <div className="sm:col-span-2 text-right text-sm font-medium">
+              {linha.garantia ? (
+                <span className="text-emerald-700 flex items-center justify-end gap-1">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  R$ 0,00
+                </span>
+              ) : (
+                formatCurrency(linha.quantidade * linha.valor_unitario)
+              )}
+            </div>
+            <div className="sm:col-span-1 flex justify-end">
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={() => onRemove(index)}
+                disabled={linhas.length === 1}
+              >
+                <Trash2 className="h-3 w-3 text-destructive" />
+              </Button>
+            </div>
+          </div>
+        ))}
+
+        <div className="flex justify-end pr-1">
+          <span className="text-sm font-semibold">
+            {subtotalLabel}: {formatCurrency(soma)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function OrcamentoForm({
   orderId,
   diagnosticoData,
@@ -41,18 +170,22 @@ export function OrcamentoForm({
   onSubmit,
   onSendToClient,
 }: OrcamentoFormProps) {
-  const rawPecas = existingOrcamento?.pecas as OrcamentoItem[] | null | undefined;
-  const existingPecas: PecaItem[] =
-    rawPecas?.map((i) => ({
+  const paraLinhas = (raw: unknown): LinhaItem[] =>
+    ((raw as OrcamentoItem[] | null | undefined) ?? []).map((i) => ({
       descricao: i.descricao,
       quantidade: i.quantidade,
       valor_unitario: i.valor_unitario,
-    })) || [];
+      garantia: i.garantia === true,
+    }));
 
-  const [pecas, setPecas] = useState<PecaItem[]>(
-    existingPecas.length > 0
-      ? existingPecas
-      : [{ descricao: "", quantidade: 1, valor_unitario: 0 }]
+  const existingPecas = paraLinhas(existingOrcamento?.pecas);
+  const existingServicos = paraLinhas(existingOrcamento?.servicos);
+
+  const [pecas, setPecas] = useState<LinhaItem[]>(
+    existingPecas.length > 0 ? existingPecas : [{ ...LINHA_VAZIA }]
+  );
+  const [servicos, setServicos] = useState<LinhaItem[]>(
+    existingServicos.length > 0 ? existingServicos : [{ ...LINHA_VAZIA }]
   );
   const [maoObra, setMaoObra] = useState(
     existingOrcamento?.mao_de_obra || 0
@@ -64,45 +197,50 @@ export function OrcamentoForm({
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
 
-  const totalPecas = useMemo(
-    () => pecas.reduce((acc, p) => acc + p.quantidade * p.valor_unitario, 0),
-    [pecas]
+  const totalPecas = useMemo(() => pecas.reduce((acc, p) => acc + subtotal(p), 0), [pecas]);
+  const totalServicos = useMemo(() => servicos.reduce((acc, sv) => acc + subtotal(sv), 0), [servicos]);
+
+  // O que a garantia absorveu — não é cobrado, mas mostramos para o cliente ver o benefício.
+  const totalGarantia = useMemo(
+    () => [...pecas, ...servicos]
+      .filter((i) => i.garantia && i.descricao.trim() !== "")
+      .reduce((acc, i) => acc + i.quantidade * i.valor_unitario, 0),
+    [pecas, servicos]
   );
 
   const total = useMemo(
-    () => totalPecas + maoObra,
-    [totalPecas, maoObra]
+    () => totalPecas + totalServicos + maoObra,
+    [totalPecas, totalServicos, maoObra]
   );
 
-  const addPeca = useCallback(() => {
-    setPecas((prev) => [
-      ...prev,
-      { descricao: "", quantidade: 1, valor_unitario: 0 },
-    ]);
-  }, []);
-
-  const removePeca = useCallback((index: number) => {
-    setPecas((prev) => prev.filter((_, i) => i !== index));
-  }, []);
-
+  const addPeca = useCallback(() => setPecas((prev) => [...prev, { ...LINHA_VAZIA }]), []);
+  const removePeca = useCallback((index: number) => setPecas((prev) => prev.filter((_, i) => i !== index)), []);
   const updatePeca = useCallback(
-    (index: number, field: keyof PecaItem, value: string | number) => {
-      setPecas((prev) =>
-        prev.map((p, i) => (i === index ? { ...p, [field]: value } : p))
-      );
+    (index: number, field: keyof LinhaItem, value: string | number | boolean) => {
+      setPecas((prev) => prev.map((p, i) => (i === index ? { ...p, [field]: value } : p)));
     },
     []
   );
 
-  function buildOrcamentoItems(): OrcamentoItem[] {
-    return pecas
-      .filter((p) => p.descricao.trim() !== "")
-      .map((p) => ({
-        descricao: p.descricao,
-        quantidade: p.quantidade,
-        valor_unitario: p.valor_unitario,
-        valor_total: p.quantidade * p.valor_unitario,
-        tipo: "peca" as const,
+  const addServico = useCallback(() => setServicos((prev) => [...prev, { ...LINHA_VAZIA }]), []);
+  const removeServico = useCallback((index: number) => setServicos((prev) => prev.filter((_, i) => i !== index)), []);
+  const updateServico = useCallback(
+    (index: number, field: keyof LinhaItem, value: string | number | boolean) => {
+      setServicos((prev) => prev.map((p, i) => (i === index ? { ...p, [field]: value } : p)));
+    },
+    []
+  );
+
+  function serializar(linhas: LinhaItem[], tipo: "peca" | "servico"): OrcamentoItem[] {
+    return linhas
+      .filter((l) => l.descricao.trim() !== "")
+      .map((l) => ({
+        descricao: l.descricao,
+        quantidade: l.quantidade,
+        valor_unitario: l.garantia ? 0 : l.valor_unitario,
+        valor_total: subtotal(l),
+        tipo,
+        garantia: l.garantia,
       }));
   }
 
@@ -111,13 +249,11 @@ export function OrcamentoForm({
     try {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
-      const pecasItems = buildOrcamentoItems();
-
       const orcamentoData = {
         ordem_id: orderId,
         criado_por: user?.id,
-        pecas: pecasItems,
-        servicos: [],
+        pecas: serializar(pecas, "peca"),
+        servicos: serializar(servicos, "servico"),
         mao_de_obra: maoObra,
         custos_adicionais: 0,
         prazo_estimado: prazoEstimado || null,
@@ -182,108 +318,35 @@ export function OrcamentoForm({
   return (
     <div className="space-y-6">
       {/* Pecas */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="text-sm font-semibold">Pecas</h4>
-          <Button variant="outline" size="xs" onClick={addPeca}>
-            <Plus className="h-3 w-3 mr-1" />
-            Adicionar
-          </Button>
-        </div>
-
-        <div className="space-y-2">
-          <div className="hidden sm:grid grid-cols-12 gap-2 px-1">
-            <div className="col-span-5 text-xs text-muted-foreground font-medium">
-              Nome
-            </div>
-            <div className="col-span-2 text-xs text-muted-foreground font-medium">
-              Qtd
-            </div>
-            <div className="col-span-2 text-xs text-muted-foreground font-medium">
-              Valor Unit.
-            </div>
-            <div className="col-span-2 text-xs text-muted-foreground font-medium text-right">
-              Subtotal
-            </div>
-            <div className="col-span-1" />
-          </div>
-
-          {pecas.map((peca, index) => (
-            <div
-              key={index}
-              className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center rounded-lg border p-2"
-            >
-              <div className="sm:col-span-5">
-                <Input
-                  placeholder="Nome da peca"
-                  value={peca.descricao}
-                  onChange={(e) =>
-                    updatePeca(index, "descricao", e.target.value)
-                  }
-                  className="text-sm h-8"
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <Input
-                  type="number"
-                  min={1}
-                  value={peca.quantidade}
-                  onChange={(e) =>
-                    updatePeca(
-                      index,
-                      "quantidade",
-                      parseInt(e.target.value) || 1
-                    )
-                  }
-                  className="text-sm h-8"
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <Input
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  value={peca.valor_unitario}
-                  onChange={(e) =>
-                    updatePeca(
-                      index,
-                      "valor_unitario",
-                      parseFloat(e.target.value) || 0
-                    )
-                  }
-                  className="text-sm h-8"
-                />
-              </div>
-              <div className="sm:col-span-2 text-right text-sm font-medium">
-                {formatCurrency(peca.quantidade * peca.valor_unitario)}
-              </div>
-              <div className="sm:col-span-1 flex justify-end">
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  onClick={() => removePeca(index)}
-                  disabled={pecas.length === 1}
-                >
-                  <Trash2 className="h-3 w-3 text-destructive" />
-                </Button>
-              </div>
-            </div>
-          ))}
-
-          <div className="flex justify-end pr-1">
-            <span className="text-sm font-semibold">
-              Subtotal Pecas: {formatCurrency(totalPecas)}
-            </span>
-          </div>
-        </div>
-      </div>
+      <LinhasSecao
+        titulo="Peças"
+        rotuloItem="Nome da peça"
+        linhas={pecas}
+        subtotalLabel="Subtotal de peças"
+        onAdd={addPeca}
+        onRemove={removePeca}
+        onUpdate={updatePeca}
+      />
 
       <Separator />
 
-      {/* Mao de Obra e Prazo */}
+      {/* Servicos / mao de obra */}
+      <LinhasSecao
+        titulo="Serviços e mão de obra"
+        rotuloItem="Descrição do serviço executado"
+        linhas={servicos}
+        subtotalLabel="Subtotal de serviços"
+        onAdd={addServico}
+        onRemove={removeServico}
+        onUpdate={updateServico}
+      />
+
+      <Separator />
+
+      {/* Mao de obra avulsa e prazo */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <Label className="text-sm font-medium">Mao de Obra (R$)</Label>
+          <Label className="text-sm font-medium">Mão de obra adicional (R$)</Label>
           <Input
             type="number"
             min={0}
@@ -292,11 +355,14 @@ export function OrcamentoForm({
             onChange={(e) => setMaoObra(parseFloat(e.target.value) || 0)}
             className="mt-1"
           />
+          <p className="text-[11px] text-muted-foreground mt-1">
+            Use para um valor fechado. Serviços detalhados vão na seção acima.
+          </p>
         </div>
         <div>
-          <Label className="text-sm font-medium">Prazo Estimado</Label>
+          <Label className="text-sm font-medium">Prazo estimado</Label>
           <Input
-            placeholder="Ex: 3 dias uteis"
+            placeholder="Ex: 3 dias úteis"
             value={prazoEstimado}
             onChange={(e) => setPrazoEstimado(e.target.value)}
             className="mt-1"
@@ -306,9 +372,9 @@ export function OrcamentoForm({
 
       {/* Observacoes */}
       <div>
-        <Label className="text-sm font-medium">Observacoes</Label>
+        <Label className="text-sm font-medium">Observações</Label>
         <Textarea
-          placeholder="Observacoes sobre o orcamento..."
+          placeholder="Observações sobre o orçamento..."
           value={observacoes}
           onChange={(e) => setObservacoes(e.target.value)}
           className="mt-1"
@@ -322,18 +388,37 @@ export function OrcamentoForm({
       <div className="rounded-lg bg-muted/50 p-4">
         <div className="space-y-1.5 text-sm">
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Pecas</span>
+            <span className="text-muted-foreground">Peças</span>
             <span>{formatCurrency(totalPecas)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Mao de Obra</span>
+            <span className="text-muted-foreground">Serviços</span>
+            <span>{formatCurrency(totalServicos)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Mão de obra adicional</span>
             <span>{formatCurrency(maoObra)}</span>
           </div>
+          {totalGarantia > 0 && (
+            <div className="flex justify-between text-emerald-700">
+              <span className="flex items-center gap-1.5">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Coberto pela garantia
+              </span>
+              <span>&minus; {formatCurrency(totalGarantia)}</span>
+            </div>
+          )}
           <Separator className="my-2" />
           <div className="flex justify-between text-base font-bold">
-            <span>Total</span>
+            <span>Total a pagar</span>
             <span className="text-primary">{formatCurrency(total)}</span>
           </div>
+          {totalGarantia > 0 && (
+            <p className="text-[11px] text-muted-foreground pt-1">
+              Os itens marcados como garantia continuam registrados na ordem e no histórico
+              do cliente, com valor zerado.
+            </p>
+          )}
         </div>
       </div>
 

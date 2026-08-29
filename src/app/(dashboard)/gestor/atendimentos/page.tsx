@@ -10,7 +10,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Bell, MapPin, Copy, Phone, Bike, Clock, Star } from "lucide-react";
+import { Bell, MapPin, Copy, Phone, Bike, Clock, Star, Archive } from "lucide-react";
 import {
   LOCAIS_ATENDIMENTO, LOCAL_ATENDIMENTO_LABEL, LOCAL_ATENDIMENTO_ENDERECO,
   STATUS_ATENDIMENTO, STATUS_ATENDIMENTO_COR, TIPOS_SOLICITACAO,
@@ -25,6 +25,7 @@ interface Atendimento {
   observacoes: string | null;
   data_agendamento: string | null;
   status_atendimento: string | null;
+  status: string | null;
   created_at: string;
   cliente: { nome: string; telefone: string | null } | null;
   scooter: { modelo: string; chassi: string | null } | null;
@@ -64,12 +65,13 @@ function textoParaTecnico(a: Atendimento): string {
 export default function GestorAtendimentosPage() {
   const [rows, setRows] = useState<Atendimento[]>([]);
   const [loading, setLoading] = useState(true);
+  const [aba, setAba] = useState<"andamento" | "finalizados">("andamento");
 
   const load = useCallback(async () => {
     const supabase = createClient();
     const { data } = await supabase
       .from("ordens_servico")
-      .select("id, numero, tipo, local_atendimento, pedido_geral, observacoes, data_agendamento, status_atendimento, created_at, cliente:profiles!cliente_id(nome, telefone), scooter:scooters!scooter_id(modelo, chassi)")
+      .select("id, numero, tipo, local_atendimento, pedido_geral, observacoes, data_agendamento, status_atendimento, status, created_at, cliente:profiles!cliente_id(nome, telefone), scooter:scooters!scooter_id(modelo, chassi)")
       .not("local_atendimento", "is", null)
       .order("created_at", { ascending: false });
     setRows((data ?? []) as unknown as Atendimento[]);
@@ -95,7 +97,16 @@ export default function GestorAtendimentosPage() {
     load();
   }
 
-  const novos = rows.filter((a) => a.status_atendimento === "novo" || a.status_atendimento === "aguardando_contato").length;
+  // Encerrado: pelo fluxo de pós-venda ou pelo estado da própria ordem.
+  const ENCERRADOS_ATEND = ["finalizado", "entregue"];
+  const ENCERRADOS_OS = ["finalizado", "entregue", "cancelado"];
+  const encerrado = (a: Atendimento) =>
+    ENCERRADOS_ATEND.includes(a.status_atendimento ?? "") || ENCERRADOS_OS.includes(a.status ?? "");
+
+  const emAndamento = rows.filter((a) => !encerrado(a));
+  const finalizados = rows.filter(encerrado);
+  const visiveis = aba === "andamento" ? emAndamento : finalizados;
+  const novos = emAndamento.filter((a) => a.status_atendimento === "novo" || a.status_atendimento === "aguardando_contato").length;
 
   function Cartao({ a, destaque }: { a: Atendimento; destaque?: boolean }) {
     const isCaragua = a.local_atendimento === "caraguatatuba";
@@ -152,14 +163,29 @@ export default function GestorAtendimentosPage() {
         <p className="text-muted-foreground text-sm">Central de novos atendimentos e agendamentos do pós-venda</p>
       </div>
 
+      <div className="flex gap-2">
+        <Button size="sm" variant={aba === "andamento" ? "default" : "outline"} onClick={() => setAba("andamento")}>
+          Em andamento
+          <Badge variant="secondary" className="ml-1.5">{emAndamento.length}</Badge>
+        </Button>
+        <Button size="sm" variant={aba === "finalizados" ? "default" : "outline"} onClick={() => setAba("finalizados")}>
+          <Archive className="h-3.5 w-3.5 mr-1" /> Finalizados
+          <Badge variant="secondary" className="ml-1.5">{finalizados.length}</Badge>
+        </Button>
+      </div>
+
       {loading ? (
         <div className="space-y-3">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32 w-full" />)}</div>
-      ) : rows.length === 0 ? (
-        <Card><CardContent className="py-12 text-center text-muted-foreground">Nenhum atendimento solicitado ainda.</CardContent></Card>
+      ) : visiveis.length === 0 ? (
+        <Card><CardContent className="py-12 text-center text-muted-foreground">
+          {aba === "andamento"
+            ? "Nenhum atendimento em andamento. Os encerrados estão na aba Finalizados."
+            : "Nenhum atendimento finalizado ainda."}
+        </CardContent></Card>
       ) : (
         <div className="space-y-6">
           {LOCAIS_ATENDIMENTO.map((local) => {
-            const doLocal = rows.filter((a) => a.local_atendimento === local.value);
+            const doLocal = visiveis.filter((a) => a.local_atendimento === local.value);
             if (doLocal.length === 0) return null;
             const isCaragua = local.value === "caraguatatuba";
             return (

@@ -59,10 +59,17 @@ export default function ClienteOrdensPage() {
 
   const localSel = LOCAIS_ATENDIMENTO.find((l) => l.value === form.local);
   const scooterSel = scooters.find((s) => s.id === form.scooter_id);
-  // Toda revisão é paga quando a modalidade é de 3 meses (inclui Bibi) ou quando
-  // a venda é anterior a 20/08/2026. Só as vendas a partir dessa data têm 1ª grátis.
-  const pagaSempre = preventivaSemprePaga(scooterSel?.modalidade, scooterSel?.modelo, scooterSel?.data_compra);
-  const motivoPago = motivoPreventivaPaga(scooterSel?.modalidade, scooterSel?.modelo, scooterSel?.data_compra);
+
+  // A regra depende da moto: antes de escolher, não há aviso a dar.
+  // Sem data de compra registrada, assume-se paga — não se promete gratuidade
+  // que a loja não teria como sustentar.
+  const semDataCompra = !!scooterSel && !scooterSel.data_compra;
+  const pagaSempre =
+    semDataCompra ||
+    preventivaSemprePaga(scooterSel?.modalidade, scooterSel?.modelo, scooterSel?.data_compra);
+  const motivoPago = semDataCompra
+    ? ("venda_anterior" as const)
+    : motivoPreventivaPaga(scooterSel?.modalidade, scooterSel?.modelo, scooterSel?.data_compra);
   // Compra anterior à entrada do sistema: sem cobrança de contrato.
   const legadoSel = isClienteLegado(scooterSel?.data_compra, scooterSel?.legado);
   const searchParams = useSearchParams();
@@ -98,7 +105,16 @@ export default function ClienteOrdensPage() {
         .select("scooter_id, modalidade")
         .in("scooter_id", ids);
       const modByScooter = new Map((garantias ?? []).map((g: any) => [g.scooter_id, g.modalidade]));
-      setScooters(scootersRes.data.map((s) => ({ ...s, modalidade: modByScooter.get(s.id) ?? null })) as unknown as Scooter[]);
+      const comModalidade = scootersRes.data.map((s) => ({
+        ...s,
+        modalidade: modByScooter.get(s.id) ?? null,
+      })) as unknown as Scooter[];
+      setScooters(comModalidade);
+      // Quase todo cliente tem uma moto só: já deixa escolhida, senão o aviso da
+      // revisão fica esperando uma seleção que ninguém faz.
+      if (comModalidade.length === 1) {
+        setForm((f) => (f.scooter_id ? f : { ...f, scooter_id: comModalidade[0].id }));
+      }
     }
 
     // Motos compradas antes de 20/08/2026 não geram aviso/bloqueio de contrato.
@@ -211,7 +227,7 @@ export default function ClienteOrdensPage() {
 
               {/* Aviso da revisão. Venda anterior a 20/08/2026: tudo pago.
                   A partir dela: 1ª gratuita, conforme a modalidade da garantia. */}
-              {form.tipo === "preventiva" && (
+              {form.tipo === "preventiva" && scooterSel && (
                 pagaSempre ? (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 flex items-start gap-2 text-sm">
                     <ShieldCheck className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
@@ -322,6 +338,10 @@ export default function ClienteOrdensPage() {
               <div className="rounded-lg border bg-muted/40 p-3 flex items-start gap-2 text-xs text-muted-foreground">
                 <CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                 <p>
+                  {!scooterSel ? (
+                    "Escolha a scooter acima para ver as condições da revisão."
+                  ) : (
+                  <>
                   Ao solicitar, você declara estar <strong>ciente</strong> de que{" "}
                   {pagaSempre ? (
                     motivoPago === "modalidade" ? (
@@ -336,6 +356,8 @@ export default function ClienteOrdensPage() {
                     <strong>R$ {PREVENTIVA_VALOR},00</strong> por revisão</>
                   )}
                   . Nossa equipe entrará em contato para confirmar os detalhes do atendimento.
+                  </>
+                  )}
                 </p>
               </div>
 

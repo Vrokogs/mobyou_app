@@ -183,13 +183,37 @@ export function isModeloBibi(modelo: string | null | undefined): boolean {
   return !!modelo && modelo.toLowerCase().includes('bibi');
 }
 
-// Revisão paga sempre (sem 1ª gratuita): modalidade de 3 meses (inclui o Bibi).
-// 6 meses e 1 ano: a 1ª pode ser gratuita.
+// ---------------------------------------------------------------------------
+// Corte da 1ª revisão gratuita: 28/02/2026
+// Vendas ANTERIORES a esta data: toda revisão é paga (R$ 300), sem gratuidade.
+// Vendas a partir dela: a 1ª pode ser gratuita, conforme a modalidade.
+// É uma regra de preço, independente de [[DATA_CORTE_LEGADO]], que trata de
+// vendas anteriores à entrada do sistema (contrato e agenda automática).
+// ---------------------------------------------------------------------------
+export const DATA_CORTE_PREVENTIVA_GRATIS = '2026-02-28';
+
+// Revisão paga sempre (sem 1ª gratuita):
+//   - modalidade de 3 meses (inclui o Bibi), que é sugestiva; ou
+//   - venda anterior a 28/02/2026.
 export function preventivaSemprePaga(
   modalidade: string | null | undefined,
   modelo?: string | null,
+  dataCompra?: string | null,
 ): boolean {
-  return modalidade === '3_meses' || isModeloBibi(modelo);
+  if (modalidade === '3_meses' || isModeloBibi(modelo)) return true;
+  if (dataCompra && dataCompra.slice(0, 10) < DATA_CORTE_PREVENTIVA_GRATIS) return true;
+  return false;
+}
+
+// Motivo de a revisão ser paga — usado para escrever o aviso certo ao cliente.
+export function motivoPreventivaPaga(
+  modalidade: string | null | undefined,
+  modelo?: string | null,
+  dataCompra?: string | null,
+): 'modalidade' | 'venda_anterior' | null {
+  if (modalidade === '3_meses' || isModeloBibi(modelo)) return 'modalidade';
+  if (dataCompra && dataCompra.slice(0, 10) < DATA_CORTE_PREVENTIVA_GRATIS) return 'venda_anterior';
+  return null;
 }
 
 // Para 6 meses e 1 ano a revisão é obrigatória para manter a garantia.
@@ -218,7 +242,8 @@ export function gerarPreventivas(
   primeiraGratuita: boolean,
   modelo?: string | null,
 ): PreventivaGerada[] {
-  const semprePaga = preventivaSemprePaga(modalidade, modelo);
+  // A data da venda entra na regra: antes de 28/02/2026 não há 1ª gratuita.
+  const semprePaga = preventivaSemprePaga(modalidade, modelo, dataInicioISO);
   const qtd = PREVENTIVA_QTD_POR_MODALIDADE[modalidade] ?? 4;
   const obrigatoria = preventivaObrigatoria(modalidade, modelo);
   const base = new Date(dataInicioISO + 'T12:00:00');

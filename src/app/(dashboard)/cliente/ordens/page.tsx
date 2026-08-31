@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { Plus, ChevronRight, Wrench, AlertTriangle, FileWarning, Info, MapPin, ShieldCheck, CheckCircle2 } from "lucide-react";
 import {
   LOCAIS_ATENDIMENTO, proximasDatasLocal, horariosLocal, MENSAGEM_A_COMBINAR, TIPOS_SOLICITACAO,
-  PREVENTIVA_VALOR, PREVENTIVA_INTERVALO_DIAS, preventivaSemprePaga, isClienteLegado,
+  PREVENTIVA_VALOR, PREVENTIVA_INTERVALO_DIAS, preventivaSemprePaga, motivoPreventivaPaga, isClienteLegado,
 } from "@/lib/constants";
 
 interface Ordem {
@@ -58,9 +58,11 @@ export default function ClienteOrdensPage() {
 
   const localSel = LOCAIS_ATENDIMENTO.find((l) => l.value === form.local);
   const scooterSel = scooters.find((s) => s.id === form.scooter_id);
-  // 3 meses (inclui Bibi): revisão sempre paga e sugestiva. 6m/1a: 1ª grátis + obrigatória.
-  const pagaSugestiva = preventivaSemprePaga(scooterSel?.modalidade, scooterSel?.modelo);
-  // Compra anterior a 20/08/2026: sem preventiva gratuita e sem avisos de revisão.
+  // Toda revisão é paga quando a modalidade é de 3 meses (inclui Bibi) ou quando
+  // a venda é anterior a 28/02/2026. Só as vendas a partir dessa data têm 1ª grátis.
+  const pagaSempre = preventivaSemprePaga(scooterSel?.modalidade, scooterSel?.modelo, scooterSel?.data_compra);
+  const motivoPago = motivoPreventivaPaga(scooterSel?.modalidade, scooterSel?.modelo, scooterSel?.data_compra);
+  // Compra anterior à entrada do sistema: sem cobrança de contrato.
   const legadoSel = isClienteLegado(scooterSel?.data_compra, scooterSel?.legado);
   const searchParams = useSearchParams();
 
@@ -206,18 +208,26 @@ export default function ClienteOrdensPage() {
                 </Select>
               </div>
 
-              {/* Aviso da manutenção preventiva (varia conforme a garantia da moto).
-                  Compras anteriores a 20/08/2026 não recebem aviso de revisão. */}
-              {form.tipo === "preventiva" && !legadoSel && (
-                pagaSugestiva ? (
+              {/* Aviso da revisão. Venda anterior a 28/02/2026: tudo pago.
+                  A partir dela: 1ª gratuita, conforme a modalidade da garantia. */}
+              {form.tipo === "preventiva" && (
+                pagaSempre ? (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 flex items-start gap-2 text-sm">
                     <ShieldCheck className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
                     <div className="space-y-1">
-                      <p className="font-semibold text-amber-800">Revisão sugestiva (a cada {PREVENTIVA_INTERVALO_DIAS} dias)</p>
+                      <p className="font-semibold text-amber-800">
+                        Manutenção preventiva a cada {PREVENTIVA_INTERVALO_DIAS} dias (3 em 3 meses)
+                      </p>
                       <p className="text-amber-700">
-                        Para esta moto (garantia de 3 meses) a revisão é <strong>sugestiva</strong> e{" "}
-                        <strong>todas as manutenções preventivas são pagas</strong>, no valor de{" "}
-                        <strong>R$ {PREVENTIVA_VALOR},00</strong> por revisão.
+                        {motivoPago === "modalidade" ? (
+                          <>Para esta moto (garantia de 3 meses) a revisão é <strong>sugestiva</strong> e{" "}
+                          <strong>todas as manutenções preventivas são pagas</strong>, no valor de{" "}
+                          <strong>R$ {PREVENTIVA_VALOR},00</strong> por revisão.</>
+                        ) : (
+                          <><strong>Todas as manutenções preventivas são pagas</strong>, no valor de{" "}
+                          <strong>R$ {PREVENTIVA_VALOR},00</strong> por revisão. A gratuidade da primeira
+                          revisão vale apenas para as compras a partir de 28/02/2026.</>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -310,24 +320,22 @@ export default function ClienteOrdensPage() {
               {/* Mensagem de ciência */}
               <div className="rounded-lg border bg-muted/40 p-3 flex items-start gap-2 text-xs text-muted-foreground">
                 <CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                {legadoSel ? (
-                  <p>
-                    Nossa equipe entrará em contato para confirmar os detalhes do atendimento e
-                    informar o valor do serviço.
-                  </p>
-                ) : (
-                  <p>
-                    Ao solicitar, você declara estar <strong>ciente</strong> de que{" "}
-                    {pagaSugestiva ? (
+                <p>
+                  Ao solicitar, você declara estar <strong>ciente</strong> de que{" "}
+                  {pagaSempre ? (
+                    motivoPago === "modalidade" ? (
                       <>para esta moto (garantia de 3 meses) a revisão é <strong>sugestiva</strong> e{" "}
                       <strong>todas as manutenções preventivas são pagas</strong> (R$ {PREVENTIVA_VALOR},00 por revisão)</>
                     ) : (
-                      <>a <strong>1ª manutenção preventiva é gratuita</strong> e as demais têm o valor de{" "}
+                      <><strong>todas as manutenções preventivas são pagas</strong>, no valor de{" "}
                       <strong>R$ {PREVENTIVA_VALOR},00</strong> por revisão</>
-                    )}
-                    . Nossa equipe entrará em contato para confirmar os detalhes do atendimento.
-                  </p>
-                )}
+                    )
+                  ) : (
+                    <>a <strong>1ª manutenção preventiva é gratuita</strong> e as demais têm o valor de{" "}
+                    <strong>R$ {PREVENTIVA_VALOR},00</strong> por revisão</>
+                  )}
+                  . Nossa equipe entrará em contato para confirmar os detalhes do atendimento.
+                </p>
               </div>
 
               <Button type="submit" className="w-full" disabled={saving}>

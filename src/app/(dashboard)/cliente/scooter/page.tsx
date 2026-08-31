@@ -11,7 +11,9 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Bike, ShieldCheck, MapPin, Calendar, Hash, Battery, Cpu, Cog, CalendarClock, Gift } from "lucide-react";
-import { GARANTIA_MODALIDADE_LABEL, isClienteLegado } from "@/lib/constants";
+import {
+  GARANTIA_MODALIDADE_LABEL, isClienteLegado, preventivaSemprePaga, PREVENTIVA_VALOR,
+} from "@/lib/constants";
 
 interface ScooterFull {
   id: string;
@@ -115,6 +117,8 @@ export default function ClienteScooterPage() {
   const garantiaAtiva = garantia?.status === "ativa";
   // Compra anterior a 20/08/2026: sem agenda de revisões e sem preventiva gratuita.
   const legado = isClienteLegado(scooter.data_compra, scooter.legado);
+  // Venda anterior a 28/02/2026 (ou modalidade de 3 meses): toda revisão é paga.
+  const revisaoSemprePaga = preventivaSemprePaga(garantia?.modalidade, scooter.modelo, scooter.data_compra);
   const diasRestantes = garantia?.data_fim
     ? Math.max(0, Math.ceil((new Date(garantia.data_fim).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : 0;
@@ -237,12 +241,14 @@ export default function ClienteScooterPage() {
                     <Separator />
                     <div>
                       <p className="text-sm font-medium mb-1 flex items-center gap-1">
-                        <CalendarClock className="h-4 w-4" /> Revisões / manutenções (R$ 300 • 1ª grátis)
+                        <CalendarClock className="h-4 w-4" /> Revisões / manutenções (R$ {PREVENTIVA_VALOR}{revisaoSemprePaga ? " cada" : " • 1ª grátis"})
                       </p>
                       <p className="text-[11px] text-muted-foreground mb-2">
-                        {(garantia?.modalidade === "3_meses")
-                          ? "Revisão sugestiva — pode ser feita dentro dos 90 dias, não é obrigatória para a garantia."
-                          : "As revisões são obrigatórias para manter a garantia."}
+                        {revisaoSemprePaga
+                          ? (garantia?.modalidade === "3_meses"
+                              ? "Revisão sugestiva — pode ser feita dentro dos 90 dias, não é obrigatória para a garantia. Todas são pagas."
+                              : "Todas as revisões são pagas. A gratuidade da primeira vale para compras a partir de 28/02/2026.")
+                          : "As revisões são obrigatórias para manter a garantia. A primeira é gratuita."}
                       </p>
                       <div className="space-y-1.5">
                         {preventivas.map((p) => {

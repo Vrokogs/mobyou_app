@@ -22,7 +22,7 @@ import {
 import { toast } from "sonner";
 import type { NotaFiscal } from "@/types/database";
 import {
-  UNIDADES_VENDA, GARANTIA_MODALIDADES, gerarPreventivas, isClienteLegado, DATA_CORTE_LEGADO,
+  UNIDADES_VENDA, GARANTIA_MODALIDADES, gerarPreventivas, isClienteLegado, DATA_CORTE_LEGADO, DATA_CORTE_PREVENTIVA_GRATIS,
 } from "@/lib/constants";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -531,7 +531,11 @@ export default function VendedorImportarNFPage() {
     }
   }
 
-  // Compra anterior a 20/08/2026: cliente legado (sem contrato e sem revisões).
+  // Venda anterior a 28/02/2026: não existe 1ª revisão gratuita.
+  const semGratuitaPorData =
+    (extractedData?.venda.data_compra ?? "") < DATA_CORTE_PREVENTIVA_GRATIS;
+
+  // Compra anterior à entrada do sistema: sem contrato e sem agenda de revisões.
   const vendaLegada = isClienteLegado(
     extractedData?.venda.data_compra,
     extractedData?.venda.cliente_antigo,
@@ -755,13 +759,21 @@ export default function VendedorImportarNFPage() {
                     </div>
                   ) : (
                     <>
-                      <label className="flex items-center gap-2 text-xs cursor-pointer">
-                        <Checkbox
-                          checked={extractedData.venda.primeira_gratuita}
-                          onCheckedChange={(c) => updateVenda("primeira_gratuita", c === true)}
-                        />
-                        1ª manutenção preventiva gratuita
-                      </label>
+                      {semGratuitaPorData ? (
+                        <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-2">
+                          <strong>Sem 1ª revisão gratuita.</strong> A gratuidade vale só para compras a
+                          partir de {new Date(DATA_CORTE_PREVENTIVA_GRATIS + "T12:00:00").toLocaleDateString("pt-BR")}.
+                          Para esta venda, todas as revisões são pagas.
+                        </p>
+                      ) : (
+                        <label className="flex items-center gap-2 text-xs cursor-pointer">
+                          <Checkbox
+                            checked={extractedData.venda.primeira_gratuita}
+                            onCheckedChange={(c) => updateVenda("primeira_gratuita", c === true)}
+                          />
+                          1ª manutenção preventiva gratuita
+                        </label>
+                      )}
                       <p className="text-[11px] text-muted-foreground">Preventivas a cada 60 dias serão agendadas automaticamente.</p>
                     </>
                   )}

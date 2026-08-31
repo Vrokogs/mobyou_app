@@ -18,7 +18,7 @@ import { Plus, ChevronRight, Wrench, AlertTriangle, FileWarning, Info, MapPin, S
 import {
   LOCAIS_ATENDIMENTO, proximasDatasLocal, horariosLocal, MENSAGEM_A_COMBINAR, TIPOS_SOLICITACAO,
   PREVENTIVA_VALOR, PREVENTIVA_INTERVALO_DIAS, preventivaSemprePaga, motivoPreventivaPaga,
-  isClienteLegado, DATA_CORTE_PREVENTIVA_GRATIS_BR,
+  isClienteLegado,
 } from "@/lib/constants";
 
 interface Ordem {
@@ -242,8 +242,7 @@ export default function ClienteOrdensPage() {
                           <strong>R$ {PREVENTIVA_VALOR},00</strong> por revisão.</>
                         ) : (
                           <><strong>Todas as manutenções preventivas são pagas</strong>, no valor de{" "}
-                          <strong>R$ {PREVENTIVA_VALOR},00</strong> por revisão. A gratuidade da primeira
-                          revisão vale apenas para as compras a partir de {DATA_CORTE_PREVENTIVA_GRATIS_BR}.</>
+                          <strong>R$ {PREVENTIVA_VALOR},00</strong> por revisão.</>
                         )}
                       </p>
                     </div>

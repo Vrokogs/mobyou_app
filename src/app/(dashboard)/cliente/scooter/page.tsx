@@ -13,7 +13,6 @@ import Link from "next/link";
 import { Bike, ShieldCheck, MapPin, Calendar, Hash, Battery, Cpu, Cog, CalendarClock, Gift } from "lucide-react";
 import {
   GARANTIA_MODALIDADE_LABEL, isClienteLegado, preventivaSemprePaga, PREVENTIVA_VALOR,
-  DATA_CORTE_PREVENTIVA_GRATIS_BR,
 } from "@/lib/constants";
 
 interface ScooterFull {
@@ -248,7 +247,7 @@ export default function ClienteScooterPage() {
                         {revisaoSemprePaga
                           ? (garantia?.modalidade === "3_meses"
                               ? "Revisão sugestiva — pode ser feita dentro dos 90 dias, não é obrigatória para a garantia. Todas são pagas."
-                              : `Todas as revisões são pagas. A gratuidade da primeira vale para compras a partir de ${DATA_CORTE_PREVENTIVA_GRATIS_BR}.`)
+                              : "Todas as revisões são pagas.")
                           : "As revisões são obrigatórias para manter a garantia. A primeira é gratuita."}
                       </p>
                       <div className="space-y-1.5">

@@ -543,7 +543,7 @@ export default function ImportarNFPage() {
     }
   }
 
-  // Venda anterior a 28/02/2026: não existe 1ª revisão gratuita.
+  // Venda anterior a 20/08/2026: não existe 1ª revisão gratuita.
   const semGratuitaPorData =
     (extractedData?.venda.data_compra ?? "") < DATA_CORTE_PREVENTIVA_GRATIS;
 

@@ -17,7 +17,8 @@ import { toast } from "sonner";
 import { Plus, ChevronRight, Wrench, AlertTriangle, FileWarning, Info, MapPin, ShieldCheck, CheckCircle2 } from "lucide-react";
 import {
   LOCAIS_ATENDIMENTO, proximasDatasLocal, horariosLocal, MENSAGEM_A_COMBINAR, TIPOS_SOLICITACAO,
-  PREVENTIVA_VALOR, PREVENTIVA_INTERVALO_DIAS, preventivaSemprePaga, motivoPreventivaPaga, isClienteLegado,
+  PREVENTIVA_VALOR, PREVENTIVA_INTERVALO_DIAS, preventivaSemprePaga, motivoPreventivaPaga,
+  isClienteLegado, DATA_CORTE_PREVENTIVA_GRATIS_BR,
 } from "@/lib/constants";
 
 interface Ordem {
@@ -59,7 +60,7 @@ export default function ClienteOrdensPage() {
   const localSel = LOCAIS_ATENDIMENTO.find((l) => l.value === form.local);
   const scooterSel = scooters.find((s) => s.id === form.scooter_id);
   // Toda revisão é paga quando a modalidade é de 3 meses (inclui Bibi) ou quando
-  // a venda é anterior a 28/02/2026. Só as vendas a partir dessa data têm 1ª grátis.
+  // a venda é anterior a 20/08/2026. Só as vendas a partir dessa data têm 1ª grátis.
   const pagaSempre = preventivaSemprePaga(scooterSel?.modalidade, scooterSel?.modelo, scooterSel?.data_compra);
   const motivoPago = motivoPreventivaPaga(scooterSel?.modalidade, scooterSel?.modelo, scooterSel?.data_compra);
   // Compra anterior à entrada do sistema: sem cobrança de contrato.
@@ -208,7 +209,7 @@ export default function ClienteOrdensPage() {
                 </Select>
               </div>
 
-              {/* Aviso da revisão. Venda anterior a 28/02/2026: tudo pago.
+              {/* Aviso da revisão. Venda anterior a 20/08/2026: tudo pago.
                   A partir dela: 1ª gratuita, conforme a modalidade da garantia. */}
               {form.tipo === "preventiva" && (
                 pagaSempre ? (
@@ -226,7 +227,7 @@ export default function ClienteOrdensPage() {
                         ) : (
                           <><strong>Todas as manutenções preventivas são pagas</strong>, no valor de{" "}
                           <strong>R$ {PREVENTIVA_VALOR},00</strong> por revisão. A gratuidade da primeira
-                          revisão vale apenas para as compras a partir de 28/02/2026.</>
+                          revisão vale apenas para as compras a partir de {DATA_CORTE_PREVENTIVA_GRATIS_BR}.</>
                         )}
                       </p>
                     </div>

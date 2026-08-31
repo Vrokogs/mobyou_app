@@ -72,8 +72,11 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
   const router = useRouter();
   const clienteId = params.id as string;
   const linkarScooter = basePath === "/gestor";
-  // RLS: só o gestor tem UPDATE em profiles, então o vendedor não vê "Editar".
-  const podeEditar = basePath === "/gestor";
+  // Gestor e vendedor editam o cadastro do cliente (policy
+  // profiles_update_cliente_staff). Trocar e-mail de login e senha continua
+  // sendo só do gestor — é credencial, não dado de cadastro.
+  const podeEditar = basePath === "/gestor" || basePath === "/vendedor";
+  const podeTrocarAcesso = basePath === "/gestor";
 
   const [cliente, setCliente] = useState<Profile | null>(null);
   const [scooters, setScooters] = useState<Scooter[]>([]);
@@ -158,7 +161,9 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
 
     setSaving(false);
     if (error) {
-      toast.error("Erro ao salvar os dados do cliente", { description: error.message });
+      toast.error("Erro ao salvar os dados do cliente", {
+        description: error.message || "Sem permissão para alterar este cadastro.",
+      });
       return;
     }
     toast.success("Dados do cliente atualizados.");
@@ -324,7 +329,7 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
                 Dados do Cliente
               </CardTitle>
               <div className="flex items-center gap-2">
-              {podeEditar && (
+              {podeTrocarAcesso && (
                 <Dialog open={acessoOpen} onOpenChange={(v) => { setAcessoOpen(v); if (v) setNovoEmail(cliente.email ?? ""); }}>
                   <DialogTrigger
                     render={
@@ -396,6 +401,10 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
                     </DialogDescription>
                   </DialogHeader>
                   <form onSubmit={handleSubmit(onEditSubmit)} className="space-y-4">
+                    <p className="text-[11px] text-muted-foreground bg-muted/50 rounded-md p-2">
+                      Alterar o e-mail aqui muda o cadastro, não o login do cliente.
+                      Para trocar o acesso, use o botão <strong>Acesso</strong> (gestor).
+                    </p>
                     <div className="space-y-2">
                       <Label htmlFor="edit-nome">Nome</Label>
                       <Input id="edit-nome" {...register("nome", { required: "Nome obrigatorio" })} />

@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { Plus, Search, Eye, Upload, FileText, Trash2, Loader2 } from "lucide-react";
+import { Plus, Search, Eye, Pencil, Upload, FileText, Trash2, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 interface Cliente {
@@ -293,7 +293,10 @@ export default function VendedorClientesPage() {
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <Link href={`/vendedor/clientes/${cliente.id}`}>
-                          <Button variant="ghost" size="sm"><Eye className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="sm" title="Ver ficha"><Eye className="h-4 w-4" /></Button>
+                        </Link>
+                        <Link href={`/vendedor/clientes/${cliente.id}`}>
+                          <Button variant="ghost" size="sm" title="Editar cadastro"><Pencil className="h-4 w-4" /></Button>
                         </Link>
                         <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive"
                           disabled={deletingId === cliente.id} onClick={() => excluirCliente(cliente)} title="Excluir cliente">

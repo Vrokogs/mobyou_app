@@ -315,6 +315,9 @@ export const MOBYOU_MODELOS = [
   'Mobyou Migo',
   'Mobyou Bibi',
   'Mobyou Fyron',
+  'Mobyou Vegas',
+  'Mobyou Snake',
+  'Mobyou Tank',
 ] as const;
 
 export type MobyouModelo = (typeof MOBYOU_MODELOS)[number];

@@ -48,7 +48,15 @@ import {
 import { useForm } from "react-hook-form";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, GARANTIA_STATUS, CONTRATO_STATUS } from "@/lib/constants";
+import {
+  ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, GARANTIA_STATUS, CONTRATO_STATUS,
+  MOBYOU_MODELOS, MOBYOU_MARCA, GARANTIA_MODALIDADES, UNIDADES_VENDA,
+  gerarPreventivas, isClienteLegado, DATA_CORTE_PREVENTIVA_GRATIS,
+} from "@/lib/constants";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { Profile, Scooter, OrdemServico, Contrato, Garantia } from "@/types/database";
 import type { OrdemServicoStatus, GarantiaStatus, ContratoStatus } from "@/types/database";
 
@@ -93,6 +101,29 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
   const [novaSenha, setNovaSenha] = useState("");
   const [salvandoAcesso, setSalvandoAcesso] = useState(false);
 
+  // Segunda moto do mesmo cliente: cria scooter + garantia + revisões + venda,
+  // com as mesmas regras da importação de nota.
+  const [motoOpen, setMotoOpen] = useState(false);
+  const [salvandoMoto, setSalvandoMoto] = useState(false);
+  const [vendedores, setVendedores] = useState<{ id: string; nome: string }[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
+  const hojeISO = new Date().toISOString().slice(0, 10);
+  const MOTO_VAZIA = {
+    modelo: "", cor: "", ano: String(new Date().getFullYear()),
+    chassi: "", numero_serie: "", data_compra: hojeISO,
+    modalidade: "1_ano", primeira_gratuita: true,
+    valor: "", forma_pagamento: "pix", parcelas: "1",
+    unidade: "", vendedor_id: "", gerar_contratos: true,
+  };
+  const [moto, setMoto] = useState({ ...MOTO_VAZIA });
+  const setMotoField = (k: keyof typeof MOTO_VAZIA, v: string | boolean) =>
+    setMoto((m) => ({ ...m, [k]: v }));
+
+  // Antes de 20/08/2026 não há 1ª revisão gratuita.
+  const motoSemGratuita = moto.data_compra < DATA_CORTE_PREVENTIVA_GRATIS;
+  // Venda anterior à entrada do sistema: sem contrato para assinar e sem agenda.
+  const motoLegada = isClienteLegado(moto.data_compra, false);
+
   const { register, handleSubmit, reset, formState: { errors } } = useForm<EditFormData>();
 
   const loadData = useCallback(async () => {
@@ -135,6 +166,14 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
       });
     }
     setScooters((scootersRes.data ?? []) as Scooter[]);
+
+    // Para o campo "vendedor" da nova moto.
+    const { data: { user } } = await supabase.auth.getUser();
+    setUserId(user?.id ?? null);
+    const { data: vend } = await supabase
+      .from("profiles").select("id, nome")
+      .eq("role", "vendedor").eq("ativo", true).order("nome");
+    setVendedores((vend ?? []) as { id: string; nome: string }[]);
     setOrdens((ordensRes.data ?? []) as OrdemServico[]);
     setContratos((contratosRes.data ?? []) as Contrato[]);
     setGarantias((garantiasRes.data ?? []) as unknown as (Garantia & { scooter?: { modelo: string; chassi: string | null } })[]);
@@ -193,6 +232,140 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
       toast.error("Erro inesperado ao alterar o acesso.");
     } finally {
       setSalvandoAcesso(false);
+    }
+  }
+
+  async function criarMoto() {
+    if (!moto.modelo.trim()) { toast.error("Escolha o modelo da moto."); return; }
+    if (!moto.chassi.trim()) { toast.error("Informe o chassi."); return; }
+
+    setSalvandoMoto(true);
+    const supabase = createClient();
+    try {
+      const dataCompra = moto.data_compra || hojeISO;
+      const legado = isClienteLegado(dataCompra, false);
+
+      // 1. Moto
+      const { data: nova, error: errScooter } = await (supabase.from("scooters") as any).insert({
+        modelo: moto.modelo,
+        marca: MOBYOU_MARCA,
+        cor: moto.cor || null,
+        ano: moto.ano ? parseInt(moto.ano) : null,
+        chassi: moto.chassi.trim(),
+        numero_serie: moto.numero_serie.trim() || moto.chassi.trim(),
+        cliente_id: clienteId,
+        data_compra: dataCompra,
+        legado,
+      }).select("id").single();
+
+      if (errScooter) {
+        const dup = /duplicate|unique/i.test(errScooter.message || "");
+        toast.error(dup ? "Já existe uma moto com esse chassi." : "Erro ao cadastrar a moto", {
+          description: dup ? undefined : errScooter.message,
+        });
+        return;
+      }
+      const scooterId = (nova as { id: string }).id;
+
+      // 2. Garantia conforme a modalidade
+      const meses = GARANTIA_MODALIDADES.find((m) => m.value === moto.modalidade)?.meses ?? 12;
+      const fim = new Date(dataCompra + "T12:00:00");
+      fim.setMonth(fim.getMonth() + meses);
+      const { data: garRow } = await (supabase.from("garantias") as any).insert({
+        scooter_id: scooterId,
+        cliente_id: clienteId,
+        modalidade: moto.modalidade,
+        data_compra: dataCompra,
+        data_inicio: dataCompra,
+        data_fim: fim.toISOString().slice(0, 10),
+        status: "ativa",
+      }).select("id").single();
+
+      // 3. Agenda de revisões — cliente legado não tem
+      if (!legado) {
+        const preventivas = gerarPreventivas(
+          dataCompra, moto.modalidade, moto.primeira_gratuita, moto.modelo,
+        ).map((p) => ({
+          scooter_id: scooterId,
+          cliente_id: clienteId,
+          garantia_id: (garRow as { id?: string } | null)?.id ?? null,
+          numero: p.numero,
+          data_prevista: p.data_prevista,
+          gratuita: p.gratuita,
+          obrigatoria: p.obrigatoria,
+          valor: p.valor,
+          status: "pendente",
+        }));
+        if (preventivas.length > 0) {
+          await (supabase.from("manutencoes_preventivas") as any).insert(preventivas);
+        }
+      }
+
+      // 4. Venda, com a competência na data da compra
+      await (supabase.from("vendas") as any).insert({
+        vendedor_id: moto.vendedor_id || userId,
+        cliente_id: clienteId,
+        scooter_id: scooterId,
+        valor_total: moto.valor ? parseFloat(moto.valor) : 0,
+        entrada: 0,
+        parcelas: moto.parcelas ? parseInt(moto.parcelas) : 1,
+        forma_pagamento: moto.forma_pagamento || "pix",
+        unidade: moto.unidade || null,
+        modelo: moto.modelo,
+        chassi: moto.chassi.trim(),
+        data_venda: dataCompra,
+      });
+
+      // 5. Contratos do modelo — legado não recebe documento para assinar
+      let contratosGerados = 0;
+      if (!legado && moto.gerar_contratos) {
+        const { data: modelos } = await supabase
+          .from("modelos_contrato")
+          .select("tipo, titulo, conteudo_template, modalidade")
+          .in("tipo", ["compra_venda", "entrega", "desbloqueio"])
+          .eq("ativo", true);
+
+        const lista = (modelos ?? []) as {
+          tipo: string; titulo: string; conteudo_template: string; modalidade: string | null;
+        }[];
+        const selecionados = lista.filter(
+          (m) => m.tipo !== "compra_venda" || m.modalidade === moto.modalidade || m.modalidade == null,
+        );
+        const temEspecifico = selecionados.some(
+          (m) => m.tipo === "compra_venda" && m.modalidade === moto.modalidade,
+        );
+        const docs = selecionados
+          .filter((m) => !(temEspecifico && m.tipo === "compra_venda" && m.modalidade == null))
+          .map((mod) => ({
+            tipo: mod.tipo,
+            titulo: mod.titulo,
+            cliente_id: clienteId,
+            scooter_id: scooterId,
+            conteudo: aplicarVariaveis(mod.conteudo_template, {
+              modelo: moto.modelo, marca: MOBYOU_MARCA, cor: moto.cor,
+              ano: moto.ano, chassi: moto.chassi, numero_serie: moto.numero_serie,
+            } as unknown as Scooter),
+            status: "enviado" as const,
+          }));
+        if (docs.length > 0) {
+          await (supabase.from("contratos") as any).insert(docs);
+          contratosGerados = docs.length;
+        }
+      }
+
+      toast.success("Moto adicionada ao cliente!", {
+        description: legado
+          ? "Venda anterior ao sistema: sem contrato para assinar e sem agenda de revisões."
+          : `Garantia aberta${contratosGerados ? `, ${contratosGerados} contrato(s) gerado(s)` : ""} e revisões agendadas.`,
+      });
+      setMotoOpen(false);
+      setMoto({ ...MOTO_VAZIA });
+      loadData();
+    } catch (err) {
+      console.error("Erro ao adicionar moto:", err);
+      toast.error("Erro inesperado ao adicionar a moto.");
+    } finally {
+      setSalvandoMoto(false);
     }
   }
 
@@ -512,6 +685,233 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
             <TabsContent value="scooters">
               <Card>
                 <CardContent className="pt-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    <p className="text-sm text-muted-foreground">
+                      {scooters.length === 0
+                        ? "Nenhuma moto vinculada."
+                        : scooters.length + " moto(s) deste cliente."}
+                    </p>
+                    <Dialog
+                      open={motoOpen}
+                      onOpenChange={(v) => {
+                        setMotoOpen(v);
+                        if (v) setMoto({ ...MOTO_VAZIA, vendedor_id: userId ?? "" });
+                      }}
+                    >
+                      <DialogTrigger
+                        render={
+                          <Button size="sm">
+                            <Bike className="h-4 w-4 mr-1.5" />
+                            Adicionar moto
+                          </Button>
+                        }
+                      />
+                      <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+                        <DialogHeader>
+                          <DialogTitle>Nova moto para {cliente.nome}</DialogTitle>
+                          <DialogDescription>
+                            Cadastra a moto, abre a garantia e registra a venda. Sendo venda nova,
+                            agenda as revisões e gera os contratos para assinatura.
+                          </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                              <Label>Modelo</Label>
+                              <Select
+                                items={Object.fromEntries(MOBYOU_MODELOS.map((m) => [m, m]))}
+                                value={moto.modelo}
+                                onValueChange={(v) => setMotoField("modelo", v ?? "")}
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="Selecione o modelo" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {MOBYOU_MODELOS.map((m) => (
+                                    <SelectItem key={m} value={m}>{m}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-1.5">
+                                <Label>Cor</Label>
+                                <Input value={moto.cor} onChange={(e) => setMotoField("cor", e.target.value)} />
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label>Ano</Label>
+                                <Input type="number" value={moto.ano} onChange={(e) => setMotoField("ano", e.target.value)} />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                              <Label>Chassi</Label>
+                              <Input
+                                value={moto.chassi}
+                                onChange={(e) => setMotoField("chassi", e.target.value)}
+                                placeholder="Número do chassi"
+                                className="font-mono"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label>Nº de série (opcional)</Label>
+                              <Input
+                                value={moto.numero_serie}
+                                onChange={(e) => setMotoField("numero_serie", e.target.value)}
+                                placeholder="Repete o chassi se ficar vazio"
+                                className="font-mono"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="rounded-lg border border-emerald-200 bg-emerald-50/40 p-3 space-y-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div className="space-y-1.5">
+                                <Label>Data da compra</Label>
+                                <Input
+                                  type="date"
+                                  value={moto.data_compra}
+                                  onChange={(e) => setMotoField("data_compra", e.target.value)}
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label>Garantia</Label>
+                                <Select
+                                  items={Object.fromEntries(GARANTIA_MODALIDADES.map((m) => [m.value, m.label]))}
+                                  value={moto.modalidade}
+                                  onValueChange={(v) => setMotoField("modalidade", v ?? "1_ano")}
+                                >
+                                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    {GARANTIA_MODALIDADES.map((m) => (
+                                      <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+
+                            {motoLegada ? (
+                              <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-2">
+                                <strong>Venda anterior ao sistema.</strong> Não serão gerados contrato
+                                para assinatura nem agenda de revisões, e não há preventiva gratuita.
+                              </p>
+                            ) : motoSemGratuita ? (
+                              <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-2">
+                                <strong>Sem 1ª revisão gratuita.</strong> Para esta data de compra,
+                                todas as revisões são pagas.
+                              </p>
+                            ) : (
+                              <label className="flex items-center gap-2 text-xs cursor-pointer">
+                                <Checkbox
+                                  checked={moto.primeira_gratuita}
+                                  onCheckedChange={(c) => setMotoField("primeira_gratuita", c === true)}
+                                />
+                                1ª manutenção preventiva gratuita
+                              </label>
+                            )}
+
+                            {!motoLegada && (
+                              <label className="flex items-center gap-2 text-xs cursor-pointer">
+                                <Checkbox
+                                  checked={moto.gerar_contratos}
+                                  onCheckedChange={(c) => setMotoField("gerar_contratos", c === true)}
+                                />
+                                Gerar contratos para assinatura
+                              </label>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="space-y-1.5">
+                              <Label>Valor da venda (R$)</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={moto.valor}
+                                onChange={(e) => setMotoField("valor", e.target.value)}
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label>Parcelas</Label>
+                              <Input
+                                type="number"
+                                min="1"
+                                value={moto.parcelas}
+                                onChange={(e) => setMotoField("parcelas", e.target.value)}
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label>Forma de pagamento</Label>
+                              <Select
+                                value={moto.forma_pagamento}
+                                onValueChange={(v) => setMotoField("forma_pagamento", v ?? "pix")}
+                              >
+                                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="pix">PIX</SelectItem>
+                                  <SelectItem value="cartao">Cartão</SelectItem>
+                                  <SelectItem value="boleto">Boleto</SelectItem>
+                                  <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                                  <SelectItem value="financiamento">Financiamento</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                              <Label>Unidade (loja)</Label>
+                              <Select
+                                value={moto.unidade}
+                                onValueChange={(v) => setMotoField("unidade", v ?? "")}
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="Selecione a loja" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {UNIDADES_VENDA.map((u) => (
+                                    <SelectItem key={u} value={u}>{u}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label>Vendedor</Label>
+                              <Select
+                                items={Object.fromEntries(vendedores.map((v) => [v.id, v.nome]))}
+                                value={moto.vendedor_id}
+                                onValueChange={(v) => setMotoField("vendedor_id", v ?? "")}
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="Quem vendeu?" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {vendedores.map((v) => (
+                                    <SelectItem key={v.id} value={v.id}>{v.nome}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          <DialogFooter>
+                            <Button variant="outline" onClick={() => setMotoOpen(false)} disabled={salvandoMoto}>
+                              Cancelar
+                            </Button>
+                            <Button onClick={criarMoto} disabled={salvandoMoto}>
+                              {salvandoMoto && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
+                              Adicionar moto
+                            </Button>
+                          </DialogFooter>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+
                   {scooters.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-8">
                       Nenhuma scooter vinculada a este cliente.

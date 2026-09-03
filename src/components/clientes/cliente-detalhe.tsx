@@ -67,6 +67,7 @@ interface NotaFiscalCliente {
   id: string;
   tipo_arquivo: string | null;
   arquivo_url: string | null;
+  storage_path: string | null;
   valor: number | null;
   parcelas: number | null;
   data_compra: string | null;
@@ -188,7 +189,7 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
 
     const { data: nfs } = await supabase
       .from("notas_fiscais")
-      .select("id, tipo_arquivo, arquivo_url, valor, parcelas, data_compra, created_at, importado_por, dados_extraidos")
+      .select("id, tipo_arquivo, arquivo_url, storage_path, valor, parcelas, data_compra, created_at, importado_por, dados_extraidos")
       .eq("cliente_id", clienteId)
       .order("created_at", { ascending: false });
     setNotasFiscais((nfs ?? []) as unknown as NotaFiscalCliente[]);
@@ -258,6 +259,32 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
       toast.error("Erro inesperado ao alterar o acesso.");
     } finally {
       setSalvandoAcesso(false);
+    }
+  }
+
+  // O bucket "documentos" é privado — nota fiscal tem CPF e endereço. O link
+  // público gravado na importação não abre; geramos um link assinado na hora,
+  // válido por 5 minutos.
+  const [abrindoNota, setAbrindoNota] = useState<string | null>(null);
+
+  async function abrirNota(nf: NotaFiscalCliente) {
+    if (!nf.storage_path) {
+      toast.error("Esta nota não tem arquivo anexado.");
+      return;
+    }
+    setAbrindoNota(nf.id);
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.storage
+        .from("documentos")
+        .createSignedUrl(nf.storage_path, 300);
+      if (error || !data?.signedUrl) {
+        toast.error("Não foi possível abrir a nota", { description: error?.message });
+        return;
+      }
+      window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    } finally {
+      setAbrindoNota(null);
     }
   }
 
@@ -1222,19 +1249,18 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
                                 {format(new Date(nf.created_at), "dd/MM/yyyy HH:mm")}
                               </TableCell>
                               <TableCell>
-                                {nf.arquivo_url ? (
+                                {nf.storage_path ? (
                                   <Button
                                     variant="outline"
                                     size="xs"
-                                    render={
-                                      <a
-                                        href={nf.arquivo_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                      />
-                                    }
+                                    onClick={() => abrirNota(nf)}
+                                    disabled={abrindoNota === nf.id}
                                   >
-                                    <FileText className="h-3 w-3 mr-1" />
+                                    {abrindoNota === nf.id ? (
+                                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                    ) : (
+                                      <FileText className="h-3 w-3 mr-1" />
+                                    )}
                                     Abrir {(nf.tipo_arquivo || "arquivo").toUpperCase()}
                                   </Button>
                                 ) : (

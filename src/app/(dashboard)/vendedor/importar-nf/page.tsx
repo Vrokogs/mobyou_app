@@ -514,6 +514,24 @@ export default function VendedorImportarNFPage() {
     }
   }
 
+  // Bucket privado: o link público salvo na importação não abre. Gera um link
+  // assinado de 5 minutos no momento do clique.
+  async function abrirNotaSalva(storagePath: string | null | undefined) {
+    if (!storagePath) {
+      toast.error("Esta nota não tem arquivo anexado.");
+      return;
+    }
+    const supabase = createClient();
+    const { data, error } = await supabase.storage
+      .from("documentos")
+      .createSignedUrl(storagePath, 300);
+    if (error || !data?.signedUrl) {
+      toast.error("Não foi possível abrir a nota", { description: error?.message });
+      return;
+    }
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  }
+
   function clearUpload() {
     setExtractedData(null);
     setFileName("");
@@ -916,6 +934,7 @@ export default function VendedorImportarNFPage() {
                     tipo_arquivo?: string | null;
                     valor?: number | null;
                     arquivo_url?: string | null;
+                    storage_path?: string | null;
                     created_at: string;
                   };
                   return (
@@ -926,10 +945,14 @@ export default function VendedorImportarNFPage() {
                         R$ {(n.valor ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                       </TableCell>
                       <TableCell>
-                        {n.arquivo_url ? (
-                          <a href={n.arquivo_url} target="_blank" rel="noopener noreferrer" className="text-primary underline text-sm">
+                        {n.storage_path ? (
+                          <button
+                            type="button"
+                            onClick={() => abrirNotaSalva(n.storage_path)}
+                            className="text-primary underline text-sm cursor-pointer"
+                          >
                             Abrir
-                          </a>
+                          </button>
                         ) : (
                           "---"
                         )}

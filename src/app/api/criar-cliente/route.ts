@@ -123,6 +123,30 @@ export async function POST(req: Request) {
           "Não foi possível criar a conta. Verifique o e-mail e tente novamente.";
         return NextResponse.json({ error: msg }, { status: 400 });
       }
+
+      // O e-mail já é de alguém. Só reaproveita se for a MESMA pessoa.
+      // Sem esta checagem, um e-mail digitado errado juntava dois clientes
+      // diferentes na mesma conta: as motos, garantias e contratos de um
+      // apareciam para o outro.
+      const { data: donoAtual } = await admin
+        .from("profiles")
+        .select("nome, cpf")
+        .eq("id", existente.id)
+        .maybeSingle();
+      const cpfDono = ((donoAtual as { cpf?: string } | null)?.cpf || "").replace(/\D/g, "");
+      if (cpfDigits && cpfDono && cpfDigits !== cpfDono) {
+        const nomeDono = (donoAtual as { nome?: string } | null)?.nome || "outro cliente";
+        return NextResponse.json(
+          {
+            error:
+              `O e-mail ${email} já pertence a ${nomeDono} (CPF ${cpfDono}). ` +
+              `Este cadastro está com o CPF ${cpfDigits}. ` +
+              `Confira o e-mail antes de importar — continuar juntaria os dois clientes na mesma conta.`,
+          },
+          { status: 409 }
+        );
+      }
+
       clienteId = existente.id;
       jaExistia = true;
       if (senhaInformada) {

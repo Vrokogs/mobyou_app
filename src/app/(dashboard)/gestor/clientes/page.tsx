@@ -6,6 +6,9 @@ import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -75,10 +78,23 @@ function extractClienteFromXml(xmlText: string): ClienteFromNf {
   return result;
 }
 
+
+const MESES_PT = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+];
+
+// "2026-08" -> "Agosto/2026"
+function rotuloMes(ym: string): string {
+  const [ano, mes] = ym.split("-");
+  return MESES_PT[Number(mes) - 1] + "/" + ano;
+}
+
 export default function ClientesPage() {
   const [clientes, setClientes] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [mesCadastro, setMesCadastro] = useState<string>("todos");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [scooterCounts, setScooterCounts] = useState<Record<string, number>>({});
@@ -185,6 +201,16 @@ export default function ClientesPage() {
   useEffect(() => {
     loadClientes();
   }, [loadClientes]);
+
+  // Meses que realmente têm cliente cadastrado, do mais recente para o mais antigo.
+  const mesesDisponiveis = Array.from(
+    new Set(clientes.map((c) => (c.created_at || "").slice(0, 7)).filter(Boolean)),
+  ).sort().reverse();
+
+  const clientesFiltrados =
+    mesCadastro === "todos"
+      ? clientes
+      : clientes.filter((c) => (c.created_at || "").slice(0, 7) === mesCadastro);
 
   async function onSubmit(formData: ClienteFormData) {
     setSaving(true);
@@ -376,13 +402,41 @@ export default function ClientesPage() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 max-w-sm">
-        <Search className="h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar por nome, CPF, e-mail ou telefone..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2 flex-1 min-w-[240px] max-w-sm">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nome, CPF, e-mail ou telefone..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        <Select
+          items={Object.fromEntries([
+            ["todos", "Todos os meses"],
+            ...mesesDisponiveis.map((m) => [m, rotuloMes(m)]),
+          ])}
+          value={mesCadastro}
+          onValueChange={(v: string | null) => setMesCadastro(v ?? "todos")}
+        >
+          <SelectTrigger className="w-56">
+            <SelectValue placeholder="Cadastrados em" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos os meses</SelectItem>
+            {mesesDisponiveis.map((m) => (
+              <SelectItem key={m} value={m}>
+                {rotuloMes(m)} — {clientes.filter((c) => (c.created_at || "").slice(0, 7) === m).length}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <span className="text-sm text-muted-foreground">
+          {clientesFiltrados.length} cliente(s)
+          {mesCadastro !== "todos" && " em " + rotuloMes(mesCadastro)}
+        </span>
       </div>
 
       <Card>
@@ -393,7 +447,7 @@ export default function ClientesPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {clientes.length === 0 ? (
+          {clientesFiltrados.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
               Nenhum cliente encontrado.
             </p>
@@ -411,7 +465,7 @@ export default function ClientesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {clientes.map((cliente) => (
+                {clientesFiltrados.map((cliente) => (
                   <TableRow key={cliente.id}>
                     <TableCell className="font-medium">{cliente.nome}</TableCell>
                     <TableCell>{formatCpf(cliente.cpf)}</TableCell>

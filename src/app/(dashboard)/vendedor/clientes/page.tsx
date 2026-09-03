@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -21,6 +24,18 @@ interface Cliente {
   telefone: string;
   email: string;
   ativo: boolean;
+  created_at: string;
+}
+
+const MESES_PT = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+];
+
+// "2026-08" -> "Agosto/2026"
+function rotuloMes(ym: string): string {
+  const [ano, mes] = ym.split("-");
+  return MESES_PT[Number(mes) - 1] + "/" + ano;
 }
 
 function extractClienteFromXml(xmlText: string) {
@@ -52,6 +67,7 @@ export default function VendedorClientesPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [mesCadastro, setMesCadastro] = useState<string>("todos");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ nome: "", cpf: "", telefone: "", email: "", endereco: "" });
@@ -85,7 +101,7 @@ export default function VendedorClientesPage() {
     const supabase = createClient();
     const { data } = await supabase
       .from("profiles")
-      .select("id, nome, cpf, telefone, email, ativo")
+      .select("id, nome, cpf, telefone, email, ativo, created_at")
       .eq("role", "cliente")
       .order("nome");
     if (data) setClientes(data as unknown as Cliente[]);
@@ -152,11 +168,20 @@ export default function VendedorClientesPage() {
     e.target.value = "";
   }
 
-  const filtered = clientes.filter(c =>
-    c.nome?.toLowerCase().includes(search.toLowerCase()) ||
-    c.cpf?.includes(search) ||
-    c.email?.toLowerCase().includes(search.toLowerCase())
-  );
+  // Meses que realmente têm cliente cadastrado, do mais recente para o mais antigo.
+  const mesesDisponiveis = Array.from(
+    new Set(clientes.map((c) => (c.created_at || "").slice(0, 7)).filter(Boolean)),
+  ).sort().reverse();
+
+  const filtered = clientes.filter(c => {
+    if (mesCadastro !== "todos" && (c.created_at || "").slice(0, 7) !== mesCadastro) return false;
+    if (!search.trim()) return true;
+    return (
+      c.nome?.toLowerCase().includes(search.toLowerCase()) ||
+      c.cpf?.includes(search) ||
+      c.email?.toLowerCase().includes(search.toLowerCase())
+    );
+  });
 
   return (
     <div className="space-y-6">
@@ -245,14 +270,42 @@ export default function VendedorClientesPage() {
 
       <Card>
         <CardHeader>
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nome, CPF ou e-mail..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pl-10"
-            />
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[220px] max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nome, CPF ou e-mail..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            <Select
+              items={Object.fromEntries([
+                ["todos", "Todos os meses"],
+                ...mesesDisponiveis.map((m) => [m, rotuloMes(m)]),
+              ])}
+              value={mesCadastro}
+              onValueChange={(v: string | null) => setMesCadastro(v ?? "todos")}
+            >
+              <SelectTrigger className="w-56">
+                <SelectValue placeholder="Cadastrados em" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os meses</SelectItem>
+                {mesesDisponiveis.map((m) => (
+                  <SelectItem key={m} value={m}>
+                    {rotuloMes(m)} — {clientes.filter((c) => (c.created_at || "").slice(0, 7) === m).length}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <span className="text-sm text-muted-foreground">
+              {filtered.length} cliente(s)
+              {mesCadastro !== "todos" && " em " + rotuloMes(mesCadastro)}
+            </span>
           </div>
         </CardHeader>
         <CardContent>

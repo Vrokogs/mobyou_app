@@ -108,6 +108,8 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
   const [cliente, setCliente] = useState<Profile | null>(null);
   const [scooters, setScooters] = useState<Scooter[]>([]);
   const [notasFiscais, setNotasFiscais] = useState<NotaFiscalCliente[]>([]);
+  // id da conta -> nome, para mostrar quem cadastrou cada moto
+  const [autores, setAutores] = useState<Record<string, string>>({});
   const [ordens, setOrdens] = useState<OrdemServico[]>([]);
   const [contratos, setContratos] = useState<Contrato[]>([]);
   const [garantias, setGarantias] = useState<(Garantia & { scooter?: { modelo: string; chassi: string | null } })[]>([]);
@@ -193,6 +195,21 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
       .eq("cliente_id", clienteId)
       .order("created_at", { ascending: false });
     setNotasFiscais((nfs ?? []) as unknown as NotaFiscalCliente[]);
+
+    // Nomes de quem cadastrou as motos e importou as notas
+    const idsAutores = Array.from(
+      new Set([
+        ...((scootersRes.data ?? []) as Scooter[]).map((m) => m.criado_por),
+        ...((nfs ?? []) as { importado_por: string | null }[]).map((n) => n.importado_por),
+      ].filter(Boolean) as string[]),
+    );
+    if (idsAutores.length > 0) {
+      const { data: pessoas } = await supabase
+        .from("profiles").select("id, nome").in("id", idsAutores);
+      const mapa: Record<string, string> = {};
+      for (const pes of (pessoas ?? []) as { id: string; nome: string }[]) mapa[pes.id] = pes.nome;
+      setAutores(mapa);
+    }
 
     // Para o campo "vendedor" da nova moto.
     const { data: { user } } = await supabase.auth.getUser();
@@ -309,6 +326,7 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
         cliente_id: clienteId,
         data_compra: dataCompra,
         legado,
+        criado_por: userId,
       }).select("id").single();
 
       if (errScooter) {
@@ -332,6 +350,7 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
         data_inicio: dataCompra,
         data_fim: fim.toISOString().slice(0, 10),
         status: "ativa",
+        criado_por: userId,
       }).select("id").single();
 
       // 3. Agenda de revisões — cliente legado não tem
@@ -367,6 +386,7 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
         modelo: moto.modelo,
         chassi: moto.chassi.trim(),
         data_venda: dataCompra,
+        criado_por: userId,
       });
 
       // 5. Contratos do modelo — legado não recebe documento para assinar
@@ -399,6 +419,7 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
               ano: moto.ano, chassi: moto.chassi, numero_serie: moto.numero_serie,
             } as unknown as Scooter),
             status: "enviado" as const,
+            criado_por: userId,
           }));
         if (docs.length > 0) {
           await (supabase.from("contratos") as any).insert(docs);
@@ -978,6 +999,7 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
                           <TableHead>Cor</TableHead>
                           <TableHead>Chassi</TableHead>
                           <TableHead>KM</TableHead>
+                          <TableHead>Cadastrada por</TableHead>
                           <TableHead>Status</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1002,6 +1024,20 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
                               {scooter.chassi ?? "---"}
                             </TableCell>
                             <TableCell>{scooter.km_atual} km</TableCell>
+                            <TableCell className="text-sm">
+                              {scooter.criado_por ? (
+                                <>
+                                  {autores[scooter.criado_por] ?? "---"}
+                                  <span className="block text-xs text-muted-foreground">
+                                    {format(new Date(scooter.created_at), "dd/MM/yyyy HH:mm")}
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="text-muted-foreground">
+                                  não registrado
+                                </span>
+                              )}
+                            </TableCell>
                             <TableCell>
                               <Badge variant="secondary">{scooter.status}</Badge>
                             </TableCell>
@@ -1201,7 +1237,7 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
                           <TableHead>Data da compra</TableHead>
                           <TableHead>Motos</TableHead>
                           <TableHead>Valor</TableHead>
-                          <TableHead>Importada em</TableHead>
+                          <TableHead>Importada por</TableHead>
                           <TableHead>Arquivo</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1245,8 +1281,11 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
                                   <span className="text-xs text-muted-foreground"> · {nf.parcelas}x</span>
                                 )}
                               </TableCell>
-                              <TableCell className="text-sm text-muted-foreground">
-                                {format(new Date(nf.created_at), "dd/MM/yyyy HH:mm")}
+                              <TableCell className="text-sm">
+                                {nf.importado_por ? autores[nf.importado_por] ?? "---" : "---"}
+                                <span className="block text-xs text-muted-foreground">
+                                  {format(new Date(nf.created_at), "dd/MM/yyyy HH:mm")}
+                                </span>
                               </TableCell>
                               <TableCell>
                                 {nf.storage_path ? (

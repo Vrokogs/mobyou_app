@@ -420,6 +420,7 @@ export default function VendedorImportarNFPage() {
           cliente_id: clienteId,
           data_compra: dataInicio,
           legado,
+          criado_por: user.id,
         }).select("id").single();
 
         if (scooterError) {
@@ -437,6 +438,7 @@ export default function VendedorImportarNFPage() {
           data_inicio: dataInicio,
           data_fim: dataFimStr,
           status: "ativa",
+          criado_por: user.id,
         }).select("id").single();
 
         // Clientes legados não têm agenda de revisões nem preventiva gratuita.
@@ -477,6 +479,7 @@ export default function VendedorImportarNFPage() {
               cliente_id: clienteId,
               scooter_id: scooterId,
               status: "enviado" as const,
+              criado_por: user.id,
             }).select("id").single();
         const contratoId = (contratoData as any)?.id ?? null;
 
@@ -497,6 +500,7 @@ export default function VendedorImportarNFPage() {
           modelo: scooter.modelo || null,
           chassi: scooter.chassi || null,
           contrato_id: contratoId,
+          criado_por: user.id,
         });
       }
 

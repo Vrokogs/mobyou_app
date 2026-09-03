@@ -126,6 +126,7 @@ export default function ScootersPage() {
   async function onSubmit(formData: ScooterFormData) {
     setSaving(true);
     const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
     await (supabase.from("scooters") as any).insert({
       modelo: formData.modelo,
@@ -136,6 +137,7 @@ export default function ScootersPage() {
       chassi: formData.chassi,
       cliente_id: formData.cliente_id || null,
       data_compra: formData.data_compra || null,
+      criado_por: user?.id ?? null,
     });
 
     reset({ marca: MOBYOU_MARCA });

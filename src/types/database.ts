@@ -68,6 +68,8 @@ export type Scooter = {
   data_compra: string | null;
   // Venda anterior ao sistema: sem contrato para assinar e sem revisões.
   legado: boolean;
+  // Conta que cadastrou a moto no sistema.
+  criado_por: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -82,6 +84,7 @@ export type Garantia = {
   data_inicio: string;
   data_fim: string;
   status: GarantiaStatus;
+  criado_por: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -236,6 +239,8 @@ export type Contrato = {
   status: ContratoStatus;
   // Assinado em papel, presencialmente (sem assinatura eletrônica registrada).
   assinado_presencial: boolean;
+  // Conta que emitiu o documento.
+  criado_por: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -323,6 +328,8 @@ export type Venda = {
   unidade_negocio: string | null;
   // Data real da venda (competência). created_at é a data do cadastro.
   data_venda: string | null;
+  // Quem lançou a venda — diferente de vendedor_id, a quem ela é creditada.
+  criado_por: string | null;
   created_at: string;
 };
 

@@ -376,6 +376,7 @@ export default function ImportarNFPage() {
           cliente_id: clienteId,
           data_compra: dataInicio,
           legado,
+          criado_por: user.id,
         }).select("id").single();
 
         if (scooterError) {
@@ -394,6 +395,7 @@ export default function ImportarNFPage() {
           data_inicio: dataInicio,
           data_fim: dataFimStr,
           status: "ativa",
+          criado_por: user.id,
         }).select("id").single();
 
         // Agenda das revisões conforme a modalidade (3m=sugestiva; 6m/1a=obrigatória).
@@ -430,6 +432,7 @@ export default function ImportarNFPage() {
           unidade: venda.unidade || null,
           modelo: scooter.modelo || null,
           chassi: scooter.chassi || null,
+          criado_por: user.id,
         });
       }
 
@@ -477,6 +480,7 @@ export default function ImportarNFPage() {
             scooter_id: createdScooterIds[0] ?? null,
             conteudo: aplicar(mod.conteudo_template),
             status: "enviado" as const,
+            criado_por: user.id,
           }));
         await (supabase.from("contratos") as any).insert(docs);
       }

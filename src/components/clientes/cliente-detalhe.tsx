@@ -44,7 +44,8 @@ import {
   FilePlus2,
   Loader2,
 
-  KeyRound,} from "lucide-react";
+  KeyRound,
+  Receipt,} from "lucide-react";
 import { useForm } from "react-hook-form";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -59,6 +60,23 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Profile, Scooter, OrdemServico, Contrato, Garantia } from "@/types/database";
 import type { OrdemServicoStatus, GarantiaStatus, ContratoStatus } from "@/types/database";
+
+// Nota fiscal como ela aparece na ficha do cliente. O número da nota e as motos
+// ficam dentro do JSON extraído no momento da importação.
+interface NotaFiscalCliente {
+  id: string;
+  tipo_arquivo: string | null;
+  arquivo_url: string | null;
+  valor: number | null;
+  parcelas: number | null;
+  data_compra: string | null;
+  created_at: string;
+  importado_por: string | null;
+  dados_extraidos: {
+    venda?: { numero_nf?: string };
+    scooters?: { modelo?: string; chassi?: string }[];
+  } | null;
+}
 
 interface EditFormData {
   nome: string;
@@ -88,6 +106,7 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
 
   const [cliente, setCliente] = useState<Profile | null>(null);
   const [scooters, setScooters] = useState<Scooter[]>([]);
+  const [notasFiscais, setNotasFiscais] = useState<NotaFiscalCliente[]>([]);
   const [ordens, setOrdens] = useState<OrdemServico[]>([]);
   const [contratos, setContratos] = useState<Contrato[]>([]);
   const [garantias, setGarantias] = useState<(Garantia & { scooter?: { modelo: string; chassi: string | null } })[]>([]);
@@ -166,6 +185,13 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
       });
     }
     setScooters((scootersRes.data ?? []) as Scooter[]);
+
+    const { data: nfs } = await supabase
+      .from("notas_fiscais")
+      .select("id, tipo_arquivo, arquivo_url, valor, parcelas, data_compra, created_at, importado_por, dados_extraidos")
+      .eq("cliente_id", clienteId)
+      .order("created_at", { ascending: false });
+    setNotasFiscais((nfs ?? []) as unknown as NotaFiscalCliente[]);
 
     // Para o campo "vendedor" da nova moto.
     const { data: { user } } = await supabase.auth.getUser();
@@ -676,9 +702,9 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
                 <ShieldCheck className="h-4 w-4 mr-1" />
                 Garantias ({garantias.length})
               </TabsTrigger>
-              <TabsTrigger value="documentos">
-                <FolderOpen className="h-4 w-4 mr-1" />
-                Documentos
+              <TabsTrigger value="notas">
+                <Receipt className="h-4 w-4 mr-1.5" />
+                Notas Fiscais ({notasFiscais.length})
               </TabsTrigger>
             </TabsList>
 
@@ -1133,12 +1159,96 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
               </Card>
             </TabsContent>
 
-            <TabsContent value="documentos">
+            <TabsContent value="notas">
               <Card>
                 <CardContent className="pt-4">
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    Nenhum documento encontrado.
-                  </p>
+                  {notasFiscais.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      Nenhuma nota fiscal importada para este cliente.
+                    </p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Nº da nota</TableHead>
+                          <TableHead>Data da compra</TableHead>
+                          <TableHead>Motos</TableHead>
+                          <TableHead>Valor</TableHead>
+                          <TableHead>Importada em</TableHead>
+                          <TableHead>Arquivo</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {notasFiscais.map((nf) => {
+                          const numero = nf.dados_extraidos?.venda?.numero_nf;
+                          const motos = nf.dados_extraidos?.scooters ?? [];
+                          return (
+                            <TableRow key={nf.id}>
+                              <TableCell className="font-medium font-mono">
+                                {numero || "---"}
+                              </TableCell>
+                              <TableCell>
+                                {nf.data_compra
+                                  ? format(new Date(nf.data_compra + "T12:00:00"), "dd/MM/yyyy")
+                                  : "---"}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {motos.length === 0 ? (
+                                  "---"
+                                ) : (
+                                  <div className="space-y-0.5">
+                                    {motos.map((m, i) => (
+                                      <div key={i}>
+                                        {m.modelo || "?"}
+                                        {m.chassi && (
+                                          <span className="text-muted-foreground font-mono text-xs">
+                                            {" "}· {m.chassi}
+                                          </span>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {nf.valor != null
+                                  ? "R$ " + nf.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })
+                                  : "---"}
+                                {nf.parcelas && nf.parcelas > 1 && (
+                                  <span className="text-xs text-muted-foreground"> · {nf.parcelas}x</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {format(new Date(nf.created_at), "dd/MM/yyyy HH:mm")}
+                              </TableCell>
+                              <TableCell>
+                                {nf.arquivo_url ? (
+                                  <Button
+                                    variant="outline"
+                                    size="xs"
+                                    render={
+                                      <a
+                                        href={nf.arquivo_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                      />
+                                    }
+                                  >
+                                    <FileText className="h-3 w-3 mr-1" />
+                                    Abrir {(nf.tipo_arquivo || "arquivo").toUpperCase()}
+                                  </Button>
+                                ) : (
+                                  <Badge variant="secondary" className="text-xs">
+                                    Sem arquivo
+                                  </Badge>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

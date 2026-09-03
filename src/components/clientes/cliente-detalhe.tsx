@@ -51,9 +51,10 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import {
   ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, GARANTIA_STATUS, CONTRATO_STATUS,
-  MOBYOU_MODELOS, MOBYOU_MARCA, GARANTIA_MODALIDADES, UNIDADES_VENDA,
+  MOBYOU_MODELOS, MOBYOU_MARCA, GARANTIA_MODALIDADES, GARANTIA_MODALIDADE_LABEL, UNIDADES_VENDA,
   gerarPreventivas, isClienteLegado, DATA_CORTE_PREVENTIVA_GRATIS,
 } from "@/lib/constants";
+import { buscarContratoDaGarantia, SEM_MODELO_CONTRATO } from "@/lib/contratos";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -441,48 +442,34 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
         criado_por: userId,
       });
 
-      // 6. Contratos do modelo — legado não recebe documento para assinar
+      // 6. Contrato de compra e venda da garantia escolhida — só ele vai para
+      //    assinatura. Legado não recebe documento.
       let contratosGerados = 0;
       if (!legado && moto.gerar_contratos) {
-        const { data: modelos } = await supabase
-          .from("modelos_contrato")
-          .select("tipo, titulo, conteudo_template, modalidade")
-          .in("tipo", ["compra_venda", "entrega", "desbloqueio"])
-          .eq("ativo", true);
-
-        const lista = (modelos ?? []) as {
-          tipo: string; titulo: string; conteudo_template: string; modalidade: string | null;
-        }[];
-        const selecionados = lista.filter(
-          (m) => m.tipo !== "compra_venda" || m.modalidade === moto.modalidade || m.modalidade == null,
-        );
-        const temEspecifico = selecionados.some(
-          (m) => m.tipo === "compra_venda" && m.modalidade === moto.modalidade,
-        );
-        const docs = selecionados
-          .filter((m) => !(temEspecifico && m.tipo === "compra_venda" && m.modalidade == null))
-          .map((mod) => ({
-            tipo: mod.tipo,
-            titulo: mod.titulo,
+        const modelo = await buscarContratoDaGarantia(supabase, moto.modalidade);
+        if (!modelo) {
+          toast.warning("Moto cadastrada, mas sem contrato.", { description: SEM_MODELO_CONTRATO });
+        } else {
+          await (supabase.from("contratos") as any).insert({
+            tipo: "compra_venda",
+            titulo: modelo.titulo,
             cliente_id: clienteId,
             scooter_id: scooterId,
-            conteudo: aplicarVariaveis(mod.conteudo_template, {
+            conteudo: aplicarVariaveis(modelo.conteudo_template, {
               modelo: moto.modelo, marca: MOBYOU_MARCA, cor: moto.cor,
               ano: moto.ano, chassi: moto.chassi, numero_serie: moto.numero_serie,
             } as unknown as Scooter),
             status: "enviado" as const,
             criado_por: userId,
-          }));
-        if (docs.length > 0) {
-          await (supabase.from("contratos") as any).insert(docs);
-          contratosGerados = docs.length;
+          });
+          contratosGerados = 1;
         }
       }
 
       toast.success("Moto adicionada ao cliente!", {
         description: legado
           ? "Venda anterior ao sistema: sem contrato para assinar e sem agenda de revisões."
-          : `Garantia aberta${contratosGerados ? `, ${contratosGerados} contrato(s) gerado(s)` : ""} e revisões agendadas.`,
+          : `Garantia aberta${contratosGerados ? ", contrato de compra e venda enviado" : ""} e revisões agendadas.`,
       });
       setMotoOpen(false);
       setMoto({ ...MOTO_VAZIA });
@@ -532,37 +519,43 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
 
-      const { data: modelos } = await supabase
-        .from("modelos_contrato")
-        .select("*")
-        .in("tipo", ["compra_venda", "entrega", "desbloqueio"])
-        .eq("ativo", true);
-
-      if (!modelos || modelos.length === 0) {
-        toast.error("Nenhum modelo de documento encontrado. Rode o seed 005.");
-        setGeneratingDocs(false);
+      // A moto manda no contrato: é a modalidade da garantia dela que decide
+      // qual compra e venda o cliente assina.
+      const scooter = scooters[0] ?? null;
+      if (!scooter) {
+        toast.error("Cadastre a moto primeiro.", {
+          description: "O contrato sai da garantia da moto — sem moto não há qual escolher.",
+        });
+        return;
+      }
+      const garantia = garantias.find((g) => g.scooter_id === scooter.id);
+      if (!garantia?.modalidade) {
+        toast.error("A moto está sem modalidade de garantia.", {
+          description: "Defina 3 meses, 6 meses ou 1 ano na garantia para gerar o contrato.",
+        });
         return;
       }
 
-      const scooter = scooters[0] ?? null;
-      const novos = (modelos as { tipo: string; titulo: string; conteudo_template: string }[]).map(
-        (m) => ({
-          tipo: m.tipo,
-          titulo: m.titulo,
-          cliente_id: clienteId,
-          scooter_id: scooter?.id ?? null,
-          conteudo: aplicarVariaveis(m.conteudo_template, scooter),
-          status: "enviado" as const,
-          criado_por: user?.id ?? null,
-        })
-      );
+      const modelo = await buscarContratoDaGarantia(supabase, garantia.modalidade);
+      if (!modelo) {
+        toast.error("Modelo de contrato não encontrado", { description: SEM_MODELO_CONTRATO });
+        return;
+      }
 
-      const { error } = await (supabase.from("contratos") as any).insert(novos);
+      const { error } = await (supabase.from("contratos") as any).insert({
+        tipo: "compra_venda",
+        titulo: modelo.titulo,
+        cliente_id: clienteId,
+        scooter_id: scooter.id,
+        conteudo: aplicarVariaveis(modelo.conteudo_template, scooter),
+        status: "enviado" as const,
+        criado_por: user?.id ?? null,
+      });
       if (error) throw error;
 
-      toast.success(
-        `${novos.length} documento(s) gerado(s) e enviado(s) para assinatura.`
-      );
+      toast.success("Contrato de compra e venda enviado para assinatura.", {
+        description: `Garantia de ${GARANTIA_MODALIDADE_LABEL[garantia.modalidade] ?? garantia.modalidade}.`,
+      });
       loadData();
     } catch (err) {
       console.error("Erro ao gerar documentos:", err);
@@ -1197,7 +1190,7 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
                       ) : (
                         <FilePlus2 className="h-4 w-4 mr-1.5" />
                       )}
-                      Gerar documentos para assinatura
+                      Gerar contrato para assinatura
                     </Button>
                   </div>
                   {contratos.length === 0 ? (

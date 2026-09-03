@@ -338,7 +338,6 @@ export default function VendedorImportarNFPage() {
           email: cliente.email,
           endereco: cliente.endereco,
           senha: cliente.senha,
-          gerarContratos: false,
         }),
       });
       const cJson = await resCli.json();

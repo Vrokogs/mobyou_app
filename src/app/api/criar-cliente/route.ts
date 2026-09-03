@@ -15,7 +15,6 @@ export async function POST(req: Request) {
     email?: string;
     endereco?: string;
     senha?: string;
-    gerarContratos?: boolean;
   };
   try {
     body = await req.json();
@@ -24,7 +23,6 @@ export async function POST(req: Request) {
   }
 
   const { nome, cpf, telefone, email, endereco } = body;
-  const gerarContratos = body.gerarContratos !== false;
   if (!nome || !email) {
     return NextResponse.json(
       { error: "Nome e e-mail são obrigatórios" },
@@ -183,49 +181,10 @@ export async function POST(req: Request) {
     );
   }
 
-  // 4) Gera automaticamente os documentos para o cliente já ter a aba de
-  //    contratos vinculada (dados da scooter ficam em branco até a venda).
-  //    Pulado quando o cliente já existia ou quando quem chama gera os próprios
-  //    contratos (ex.: Importar NF, que inclui a scooter).
-  if (gerarContratos && !jaExistia) try {
-    const { data: modelos } = await admin
-      .from("modelos_contrato")
-      .select("tipo, titulo, conteudo_template")
-      .in("tipo", ["compra_venda", "entrega", "desbloqueio"])
-      .eq("ativo", true);
-
-    if (modelos && modelos.length > 0) {
-      const dataExt = new Date().toLocaleDateString("pt-BR", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      });
-      const aplicar = (t: string) =>
-        t
-          .replace(/\{\{cliente_nome\}\}/g, nome)
-          .replace(/\{\{cliente_cpf\}\}/g, cpfDigits || "")
-          .replace(/\{\{cliente_telefone\}\}/g, telefone || "")
-          .replace(/\{\{cliente_email\}\}/g, email)
-          .replace(/\{\{cliente_endereco\}\}/g, endereco || "")
-          .replace(/\{\{scooter_[a-z_]+\}\}/g, "_____")
-          .replace(/\{\{data_extenso\}\}/g, dataExt)
-          .replace(/\{\{data_atual\}\}/g, dataExt);
-
-      const novos = (
-        modelos as { tipo: string; titulo: string; conteudo_template: string }[]
-      ).map((m) => ({
-        tipo: m.tipo,
-        titulo: m.titulo,
-        cliente_id: clienteId,
-        conteudo: aplicar(m.conteudo_template),
-        status: "enviado",
-      }));
-
-      await admin.from("contratos").insert(novos);
-    }
-  } catch {
-    // Não bloqueia o cadastro se a geração de documentos falhar.
-  }
+  // O cadastro do cliente não gera contrato. Qual contrato o cliente assina
+  // depende da modalidade de garantia da moto (3 meses, 6 meses ou 1 ano), e
+  // aqui ainda não existe moto nem venda. O contrato sai quando a moto entra —
+  // por "Adicionar moto" na ficha ou pela importação da NF.
 
   return NextResponse.json({ ok: true, clienteId, email, senha: senhaRetorno, jaExistia });
 }

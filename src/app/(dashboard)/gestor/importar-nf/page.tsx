@@ -24,6 +24,7 @@ import type { NotaFiscal } from "@/types/database";
 import {
   UNIDADES_VENDA, GARANTIA_MODALIDADES, gerarPreventivas, isClienteLegado, DATA_CORTE_LEGADO, DATA_CORTE_PREVENTIVA_GRATIS,
 } from "@/lib/constants";
+import { buscarContratoDaGarantia, SEM_MODELO_CONTRATO } from "@/lib/contratos";
 import { Checkbox } from "@/components/ui/checkbox";
 
 interface ClienteData {
@@ -334,7 +335,6 @@ export default function ImportarNFPage() {
           email: cliente.email,
           endereco: cliente.endereco,
           senha: cliente.senha,
-          gerarContratos: false,
         }),
       });
       const cJson = await res.json();
@@ -459,30 +459,23 @@ export default function ImportarNFPage() {
           .replace(/\{\{data_extenso\}\}/g, dataExt)
           .replace(/\{\{data_atual\}\}/g, dataExt);
 
-      const { data: modelos } = await supabase
-        .from("modelos_contrato")
-        .select("tipo, titulo, conteudo_template, modalidade")
-        .in("tipo", ["compra_venda", "entrega", "desbloqueio"])
-        .eq("ativo", true);
-
-      if (!legado && modelos && modelos.length > 0) {
-        // Para compra_venda, usa o contrato da modalidade de garantia escolhida
-        const selecionados = (modelos as { tipo: string; titulo: string; conteudo_template: string; modalidade: string | null }[])
-          .filter((m) => m.tipo !== "compra_venda" || m.modalidade === venda.modalidade || m.modalidade == null);
-        // Se houver o específico da modalidade, descarta o genérico (modalidade null)
-        const temEspecifico = selecionados.some((m) => m.tipo === "compra_venda" && m.modalidade === venda.modalidade);
-        const docs = selecionados
-          .filter((m) => !(temEspecifico && m.tipo === "compra_venda" && m.modalidade == null))
-          .map((mod) => ({
-            tipo: mod.tipo,
-            titulo: mod.titulo,
+      // Só o contrato de compra e venda da garantia escolhida vai para
+      // assinatura. Legado não recebe documento.
+      if (!legado) {
+        const modelo = await buscarContratoDaGarantia(supabase, venda.modalidade);
+        if (!modelo) {
+          toast.warning("Importado, mas sem contrato.", { description: SEM_MODELO_CONTRATO });
+        } else {
+          await (supabase.from("contratos") as any).insert({
+            tipo: "compra_venda",
+            titulo: modelo.titulo,
             cliente_id: clienteId,
             scooter_id: createdScooterIds[0] ?? null,
-            conteudo: aplicar(mod.conteudo_template),
+            conteudo: aplicar(modelo.conteudo_template),
             status: "enviado" as const,
             criado_por: user.id,
-          }));
-        await (supabase.from("contratos") as any).insert(docs);
+          });
+        }
       }
 
       // 4. Upload do arquivo da NF (PDF/XML/imagem) para o Storage

@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { DollarSign, MapPin, TrendingUp, Store, Users, Bike, CalendarRange, Trash2 } from "lucide-react";
+import { DollarSign, MapPin, TrendingUp, Store, Users, Bike, CalendarRange, Trash2, FileText, Loader2, ReceiptText } from "lucide-react";
 import { UNIDADES_VENDA } from "@/lib/constants";
 import { toast } from "sonner";
 
@@ -21,9 +21,11 @@ interface Venda {
   forma_pagamento: string;
   origem: string | null;
   vendedor_id: string;
+  nota_fiscal_id: string | null;
   created_at: string;
   cliente: { nome: string } | null;
   vendedor: { nome: string } | null;
+  nota: { storage_path: string | null; tipo_arquivo: string | null } | null;
 }
 
 const brl = (n: number) => "R$ " + n.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
@@ -32,18 +34,35 @@ export default function GestorVendasPage() {
   const [vendas, setVendas] = useState<Venda[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletando, setDeletando] = useState<string>("");
+  const [abrindoNota, setAbrindoNota] = useState<string>("");
 
   const load = useCallback(async () => {
     const supabase = createClient();
     const { data } = await supabase
       .from("vendas")
-      .select("*, cliente:profiles!cliente_id(nome), vendedor:profiles!vendedor_id(nome)")
+      .select("*, cliente:profiles!cliente_id(nome), vendedor:profiles!vendedor_id(nome), nota:notas_fiscais!nota_fiscal_id(storage_path, tipo_arquivo)")
       .order("created_at", { ascending: false });
     setVendas((data ?? []) as unknown as Venda[]);
     setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Bucket privado: o arquivo só abre com link assinado, gerado no clique.
+  async function abrirNota(venda: Venda) {
+    const caminho = venda.nota?.storage_path;
+    if (!caminho) { toast.error("Esta venda não tem nota anexada."); return; }
+    setAbrindoNota(venda.id);
+    const supabase = createClient();
+    const { data, error } = await supabase.storage
+      .from("documentos").createSignedUrl(caminho, 300);
+    setAbrindoNota("");
+    if (error || !data?.signedUrl) {
+      toast.error("Não foi possível abrir a nota", { description: error?.message });
+      return;
+    }
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  }
 
   async function deletarVenda(id: string) {
     if (!confirm("Apagar esta venda? Se a moto estiver vinculada no estoque, ela volta a Disponível.")) return;
@@ -94,6 +113,11 @@ export default function GestorVendasPage() {
     new Set([...UNIDADES_VENDA, ...vendas.map((v) => v.unidade || "Sem unidade")])
   );
 
+  // Auditoria: venda sem nota é venda que ninguém consegue comprovar. Os
+  // formulários já não deixam mais criar uma, mas as antigas continuam aí.
+  const semNota = vendas.filter((v) => !v.nota?.storage_path);
+  const semNotaValor = semNota.reduce((s, v) => s + (v.valor_total ?? 0), 0);
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -132,6 +156,26 @@ export default function GestorVendasPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Vendas sem nota fiscal — só aparece se houver alguma */}
+      {semNota.length > 0 && (
+        <Card className="border-amber-300 bg-amber-50">
+          <CardContent className="pt-4 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs text-amber-900 flex items-center gap-1">
+                <ReceiptText className="h-3 w-3" /> Vendas sem nota fiscal anexada
+              </p>
+              <p className="text-2xl font-bold mt-1 text-amber-900">
+                {semNota.length} venda(s) · {brl(semNotaValor)}
+              </p>
+            </div>
+            <p className="text-xs text-amber-800 max-w-sm">
+              Lançamentos antigos, de antes da nota virar obrigatória. Vale conferir
+              cada um — venda sem nota não tem como ser comprovada.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Cards de total do mês por loja + total geral */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -249,6 +293,7 @@ export default function GestorVendasPage() {
                     <TableHead>Vendedor</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Valor</TableHead>
+                    <TableHead>Nota</TableHead>
                     <TableHead className="w-10"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -260,6 +305,18 @@ export default function GestorVendasPage() {
                       <TableCell>{v.vendedor?.nome ?? "---"}</TableCell>
                       <TableCell>{v.cliente?.nome ?? "---"}</TableCell>
                       <TableCell>{brl(v.valor_total ?? 0)}</TableCell>
+                      <TableCell>
+                        {v.nota?.storage_path ? (
+                          <Button variant="outline" size="xs" onClick={() => abrirNota(v)} disabled={abrindoNota === v.id}>
+                            {abrindoNota === v.id
+                              ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              : <FileText className="h-3 w-3 mr-1" />}
+                            Abrir
+                          </Button>
+                        ) : (
+                          <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800">Sem nota</Badge>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"
                           disabled={deletando === v.id} onClick={() => deletarVenda(v.id)} title="Apagar venda">

@@ -138,6 +138,8 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
     unidade: "", vendedor_id: "", gerar_contratos: true,
   };
   const [moto, setMoto] = useState({ ...MOTO_VAZIA });
+  // Nota fiscal da moto: obrigatória. Sem ela o cadastro não é gravado.
+  const [arquivoNota, setArquivoNota] = useState<File | null>(null);
   const setMotoField = (k: keyof typeof MOTO_VAZIA, v: string | boolean) =>
     setMoto((m) => ({ ...m, [k]: v }));
 
@@ -308,6 +310,18 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
   async function criarMoto() {
     if (!moto.modelo.trim()) { toast.error("Escolha o modelo da moto."); return; }
     if (!moto.chassi.trim()) { toast.error("Informe o chassi."); return; }
+    if (!arquivoNota) {
+      toast.error("Anexe a nota fiscal.", {
+        description: "Toda moto cadastrada precisa da nota no sistema.",
+      });
+      return;
+    }
+    if (!moto.valor || parseFloat(moto.valor) <= 0) {
+      toast.error("Informe o valor da venda.", {
+        description: "Sem valor, a venda entra zerada no faturamento e no ranking.",
+      });
+      return;
+    }
 
     setSalvandoMoto(true);
     const supabase = createClient();
@@ -315,7 +329,20 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
       const dataCompra = moto.data_compra || hojeISO;
       const legado = isClienteLegado(dataCompra, false);
 
-      // 1. Moto
+      // 1. Nota fiscal no Storage. Se falhar, nada é criado — melhor não cadastrar
+      //    do que cadastrar moto sem o documento que a comprova.
+      const ext = arquivoNota.name.split(".").pop()?.toLowerCase() || "pdf";
+      const caminho = `notas/${clienteId}/${Date.now()}.${ext}`;
+      const { error: errUpload } = await supabase.storage
+        .from("documentos").upload(caminho, arquivoNota, { upsert: true });
+      if (errUpload) {
+        toast.error("Não foi possível enviar a nota fiscal", { description: errUpload.message });
+        return;
+      }
+      const { data: pub } = supabase.storage.from("documentos").getPublicUrl(caminho);
+      const tipoArquivo = ext === "xml" ? "xml" : ["jpg", "jpeg", "png", "webp"].includes(ext) ? "imagem" : "pdf";
+
+      // 2. Moto
       const { data: nova, error: errScooter } = await (supabase.from("scooters") as any).insert({
         modelo: moto.modelo,
         marca: MOBYOU_MARCA,
@@ -338,7 +365,7 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
       }
       const scooterId = (nova as { id: string }).id;
 
-      // 2. Garantia conforme a modalidade
+      // 3. Garantia conforme a modalidade
       const meses = GARANTIA_MODALIDADES.find((m) => m.value === moto.modalidade)?.meses ?? 12;
       const fim = new Date(dataCompra + "T12:00:00");
       fim.setMonth(fim.getMonth() + meses);
@@ -353,7 +380,7 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
         criado_por: userId,
       }).select("id").single();
 
-      // 3. Agenda de revisões — cliente legado não tem
+      // 4. Agenda de revisões — cliente legado não tem
       if (!legado) {
         const preventivas = gerarPreventivas(
           dataCompra, moto.modalidade, moto.primeira_gratuita, moto.modelo,
@@ -373,8 +400,33 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
         }
       }
 
-      // 4. Venda, com a competência na data da compra
+      // 5. Registro da nota + venda, com a competência na data da compra
+      const { data: nfRow } = await (supabase.from("notas_fiscais") as any).insert({
+        tipo_arquivo: tipoArquivo,
+        arquivo_url: pub.publicUrl,
+        storage_path: caminho,
+        dados_extraidos: {
+          cliente: { nome: cliente?.nome, cpf: cliente?.cpf, email: cliente?.email },
+          scooters: [{ modelo: moto.modelo, chassi: moto.chassi.trim(), valor: moto.valor }],
+          venda: {
+            valor: moto.valor,
+            data_compra: dataCompra,
+            modalidade: moto.modalidade,
+            parcelas: moto.parcelas,
+            forma_pagamento: moto.forma_pagamento,
+            unidade: moto.unidade,
+          },
+        },
+        importado_por: userId,
+        cliente_id: clienteId,
+        scooter_id: scooterId,
+        valor: parseFloat(moto.valor),
+        parcelas: moto.parcelas ? parseInt(moto.parcelas) : 1,
+        data_compra: dataCompra,
+      }).select("id").single();
+
       await (supabase.from("vendas") as any).insert({
+        nota_fiscal_id: (nfRow as { id?: string } | null)?.id ?? null,
         vendedor_id: moto.vendedor_id || userId,
         cliente_id: clienteId,
         scooter_id: scooterId,
@@ -389,7 +441,7 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
         criado_por: userId,
       });
 
-      // 5. Contratos do modelo — legado não recebe documento para assinar
+      // 6. Contratos do modelo — legado não recebe documento para assinar
       let contratosGerados = 0;
       if (!legado && moto.gerar_contratos) {
         const { data: modelos } = await supabase
@@ -434,6 +486,7 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
       });
       setMotoOpen(false);
       setMoto({ ...MOTO_VAZIA });
+      setArquivoNota(null);
       loadData();
     } catch (err) {
       console.error("Erro ao adicionar moto:", err);
@@ -769,7 +822,10 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
                       open={motoOpen}
                       onOpenChange={(v) => {
                         setMotoOpen(v);
-                        if (v) setMoto({ ...MOTO_VAZIA, vendedor_id: userId ?? "" });
+                        if (v) {
+                          setMoto({ ...MOTO_VAZIA, vendedor_id: userId ?? "" });
+                          setArquivoNota(null);
+                        }
                       }}
                     >
                       <DialogTrigger
@@ -899,9 +955,26 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
                             )}
                           </div>
 
+                          <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">
+                            <Label className="flex items-center gap-1.5">
+                              <Receipt className="h-4 w-4 text-primary" />
+                              Nota fiscal <span className="text-destructive">*</span>
+                            </Label>
+                            <Input
+                              type="file"
+                              accept=".xml,.pdf,image/*"
+                              onChange={(e) => setArquivoNota(e.target.files?.[0] ?? null)}
+                            />
+                            <p className="text-[11px] text-muted-foreground">
+                              {arquivoNota
+                                ? "Anexado: " + arquivoNota.name
+                                : "Obrigatória. XML, PDF ou foto — fica guardada na aba Notas Fiscais do cliente."}
+                            </p>
+                          </div>
+
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <div className="space-y-1.5">
-                              <Label>Valor da venda (R$)</Label>
+                              <Label>Valor da venda (R$) <span className="text-destructive">*</span></Label>
                               <Input
                                 type="number"
                                 step="0.01"
@@ -976,7 +1049,10 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
                             <Button variant="outline" onClick={() => setMotoOpen(false)} disabled={salvandoMoto}>
                               Cancelar
                             </Button>
-                            <Button onClick={criarMoto} disabled={salvandoMoto}>
+                            <Button
+                              onClick={criarMoto}
+                              disabled={salvandoMoto || !arquivoNota || !moto.valor}
+                            >
                               {salvandoMoto && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
                               Adicionar moto
                             </Button>

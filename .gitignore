@@ -46,3 +46,6 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# Original da logo (2,9 MB). As versões otimizadas estão em public/images e mobyou-site/img.
+logo_mb_novo.png

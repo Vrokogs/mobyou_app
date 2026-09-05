@@ -5,6 +5,7 @@ import type {
   ContratoStatus,
   Role,
 } from '@/types/database';
+import type { TomStatus } from '@/components/ui/status-pill';
 
 export const ORDER_STATUS_LABELS: Record<OrdemServicoStatus, string> = {
   agendado: 'Agendado',
@@ -24,6 +25,32 @@ export const ORDER_STATUS_LABELS: Record<OrdemServicoStatus, string> = {
   cancelado: 'Cancelado',
   nao_compareceu: 'Nao Compareceu',
   remarcado: 'Remarcado',
+};
+
+// Tom de cada status da OS, para o <StatusPill>.
+//
+// Antes eram 16 cores diferentes — uma por status — e a tabela virava arco-íris
+// sem dizer nada. Aqui o status é agrupado pelo que ele significa para quem
+// olha: laranja = marcado, âmbar = parado esperando alguém, violeta = em
+// andamento, verde = deu certo, rosa = não vai acontecer.
+export const ORDER_STATUS_TOM: Record<OrdemServicoStatus, TomStatus> = {
+  agendado: 'alerta',
+  confirmado: 'alerta',
+  remarcado: 'alerta',
+  recebido: 'andamento',
+  checkin_realizado: 'andamento',
+  em_analise: 'andamento',
+  diagnostico_concluido: 'andamento',
+  orcamento_enviado: 'espera',
+  aguardando_aprovacao: 'espera',
+  aprovado: 'sucesso',
+  aguardando_inicio: 'sucesso',
+  em_servico: 'andamento',
+  testes_finais: 'andamento',
+  finalizado: 'sucesso',
+  entregue: 'sucesso',
+  cancelado: 'erro',
+  nao_compareceu: 'erro',
 };
 
 export const ORDER_STATUS_COLORS: Record<OrdemServicoStatus, string> = {

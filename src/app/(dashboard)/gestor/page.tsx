@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatCard } from "@/components/ui/stat-card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS } from "@/lib/constants";
+import { ORDER_STATUS_LABELS, ORDER_STATUS_TOM } from "@/lib/constants";
+import { StatusPill } from "@/components/ui/status-pill";
 import type { OrdemServicoStatus } from "@/types/database";
 import {
   CalendarCheck,
@@ -263,12 +264,9 @@ export default function GestorDashboardPage() {
                           : "---"}
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant="secondary"
-                          className={ORDER_STATUS_COLORS[order.status] ?? ""}
-                        >
+                        <StatusPill tom={ORDER_STATUS_TOM[order.status]}>
                           {ORDER_STATUS_LABELS[order.status] ?? order.status}
-                        </Badge>
+                        </StatusPill>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {formatDate(order.created_at)}

@@ -1,20 +1,73 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Eye, EyeOff } from "lucide-react";
+import {
+  Loader2, Eye, EyeOff, Mail, Lock, BarChart3, Zap, ShieldCheck, Headphones,
+} from "lucide-react";
+
+const ROTAS: Record<string, string> = {
+  gestor: "/gestor",
+  vendedor: "/vendedor",
+  tecnico: "/tecnico",
+  cliente: "/cliente",
+};
+
+const DESTAQUES = [
+  {
+    icon: BarChart3,
+    titulo: "Gestão completa",
+    texto: "Acompanhe clientes, scooters, ordens e muito mais em tempo real.",
+  },
+  {
+    icon: Zap,
+    titulo: "Mais eficiência",
+    texto: "Automatize processos e otimize o tempo da sua equipe.",
+  },
+  {
+    icon: ShieldCheck,
+    titulo: "Segurança garantida",
+    texto: "Seus dados protegidos com tecnologia de ponta e acesso seguro.",
+  },
+  {
+    icon: Headphones,
+    titulo: "Suporte dedicado",
+    texto: "Conte com nossa equipe sempre que precisar.",
+  },
+];
+
+// Guarda só o e-mail digitado, para não precisar redigitar no próximo acesso.
+// A senha nunca é gravada.
+const CHAVE_EMAIL = "mobyou:ultimo-email";
+
+const WHATSAPP_ADMIN = "https://wa.me/5511974234265";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [lembrar, setLembrar] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    try {
+      const salvo = localStorage.getItem(CHAVE_EMAIL);
+      if (salvo) {
+        setEmail(salvo);
+        setLembrar(true);
+      }
+    } catch {
+      // Navegador com armazenamento bloqueado: segue com o campo vazio.
+    }
+  }, []);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -23,7 +76,11 @@ export default function LoginPage() {
       const supabase = createClient();
       const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
-        toast.error(error.message === "Invalid login credentials" ? "E-mail ou senha incorretos" : error.message);
+        toast.error(
+          error.message === "Invalid login credentials"
+            ? "E-mail ou senha incorretos"
+            : error.message,
+        );
         return;
       }
 
@@ -33,22 +90,24 @@ export default function LoginPage() {
         return;
       }
 
+      try {
+        if (lembrar) localStorage.setItem(CHAVE_EMAIL, email);
+        else localStorage.removeItem(CHAVE_EMAIL);
+      } catch {
+        // Sem armazenamento: entrar continua funcionando normalmente.
+      }
+
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("role")
         .eq("id", userId)
         .single();
 
-      if (profileError || !profile) {
-        const role = authData.user?.user_metadata?.role || "cliente";
-        const routes: Record<string, string> = { gestor: "/gestor", vendedor: "/vendedor", tecnico: "/tecnico", cliente: "/cliente" };
-        router.push(routes[role] || "/cliente");
-        router.refresh();
-        return;
-      }
+      const role = profileError || !profile
+        ? authData.user?.user_metadata?.role || "cliente"
+        : profile.role;
 
-      const routes: Record<string, string> = { gestor: "/gestor", vendedor: "/vendedor", tecnico: "/tecnico", cliente: "/cliente" };
-      router.push(routes[profile.role] || "/cliente");
+      router.push(ROTAS[role] || "/cliente");
       router.refresh();
     } catch {
       toast.error("Erro inesperado");
@@ -58,114 +117,143 @@ export default function LoginPage() {
   }
 
   return (
-    <>
-      <style jsx global>{`
-        @keyframes gradientShift {
-          0% { background-position: 0% 50%; }
-          25% { background-position: 50% 100%; }
-          50% { background-position: 100% 50%; }
-          75% { background-position: 50% 0%; }
-          100% { background-position: 0% 50%; }
-        }
-        @keyframes floatLogo {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-8px); }
-        }
-        @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(24px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animated-bg {
-          background: #0B1A2D;
-        }
-        .float-logo {
-          animation: floatLogo 4s ease-in-out infinite;
-        }
-        .fade-up {
-          animation: fadeUp 0.6s ease-out both;
-        }
-        .fade-up-delay {
-          animation: fadeUp 0.6s ease-out 0.15s both;
-        }
-      `}</style>
+    <div className="flex min-h-screen bg-white">
+      {/* Painel de apresentação. Some no celular para a tela virar só o formulário. */}
+      <aside className="login-hero relative hidden w-1/2 flex-col justify-between p-10 text-white lg:flex xl:p-14">
+        <img
+          src="/images/logo-mobyou.png"
+          alt="MOBYOU — Mobilidade Elétrica · Litoral Norte"
+          className="relative w-40 rounded-xl"
+        />
 
-      <div className="animated-bg min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+        <div className="relative max-w-md">
+          <h1 className="text-4xl font-bold leading-tight tracking-tight">
+            Bem-vindo de volta!
+            <span className="mt-1 block text-3xl font-semibold text-white/90">
+              Acesse sua conta e{" "}
+              <span className="text-primary">gerencie tudo</span> em um só lugar.
+            </span>
+          </h1>
 
-        <div className="relative z-10 w-full max-w-[440px]">
-          {/* Floating logo */}
-          <div className="flex justify-center mb-8 fade-up">
-            <div className="float-logo">
-              <img
-                src="/images/logo-mobyou.png"
-                alt="MOBYOU"
-                className="w-28 h-28 object-contain rounded-2xl shadow-[0_0_50px_rgba(201,107,29,0.2)]"
-              />
-            </div>
-          </div>
+          <div className="my-7 h-1 w-16 rounded-full bg-primary" />
 
-          {/* Corporate card with left orange border */}
-          <div className="fade-up-delay rounded-xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.5)]"
-            style={{ borderLeft: "4px solid #C96B1D" }}>
-            <div className="bg-white p-8 sm:p-10">
-              {/* Header */}
-              <div className="mb-6">
-                <h2 className="text-lg font-bold text-[#0B1A2D]">Bem-vindo de volta</h2>
-                <p className="text-sm mt-0.5 text-[#9CA3AF]">Entre com suas credenciais para continuar</p>
-              </div>
+          <ul className="space-y-5">
+            {DESTAQUES.map((d) => (
+              <li key={d.titulo} className="flex items-start gap-4">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-primary/50 bg-primary/10">
+                  <d.icon className="h-5 w-5 text-primary" />
+                </span>
+                <span>
+                  <span className="block font-semibold">{d.titulo}</span>
+                  <span className="block text-sm leading-snug text-white/60">{d.texto}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
 
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div>
-                  <label className="text-xs font-medium mb-1.5 block text-[#6B7280]">E-mail</label>
+        <p className="relative text-xs text-white/40">
+          © {new Date().getFullYear()} Mobyou. Todos os direitos reservados.
+        </p>
+      </aside>
+
+      {/* Formulário */}
+      <main className="flex w-full items-center justify-center bg-muted/30 p-6 lg:w-1/2">
+        <div className="w-full max-w-md">
+          <img
+            src="/images/logo-mobyou.png"
+            alt="MOBYOU"
+            className="mx-auto mb-8 w-24 rounded-xl lg:hidden"
+          />
+
+          <div className="rounded-2xl border border-border bg-white p-7 shadow-sm sm:p-9">
+            <h2 className="text-2xl font-bold tracking-tight">Faça seu login</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Entre com suas credenciais para acessar o sistema.
+            </p>
+
+            <form onSubmit={handleLogin} className="mt-7 space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="email">E-mail</Label>
+                <div className="relative">
+                  <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-primary" />
                   <Input
+                    id="email"
                     type="email"
+                    required
+                    autoComplete="email"
                     placeholder="seu@email.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="h-11 rounded-lg text-sm bg-white border-[#E5E7EB] text-[#1F2937] focus:border-[#C96B1D] focus:ring-1 focus:ring-[#C96B1D]/15 transition-all"
-                    required
+                    className="h-12 pl-11"
                   />
                 </div>
-
-                <div>
-                  <div className="flex justify-between mb-1.5">
-                    <label className="text-xs font-medium text-[#6B7280]">Senha</label>
-                    <Link href="/recuperar-senha" className="text-xs font-medium text-[#C96B1D] hover:text-[#E8871E] transition-colors">
-                      Esqueceu a senha?
-                    </Link>
-                  </div>
-                  <div className="relative">
-                    <Input
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Sua senha"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="h-11 rounded-lg text-sm pr-10 bg-white border-[#E5E7EB] text-[#1F2937] focus:border-[#C96B1D] focus:ring-1 focus:ring-[#C96B1D]/15 transition-all"
-                      required
-                    />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9CA3AF] hover:text-[#0B1A2D] transition-colors">
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="pt-2">
-                  <Button type="submit" disabled={loading}
-                    className="w-full h-11 bg-[#0B1A2D] hover:bg-[#0F2340] text-white font-semibold text-sm rounded-lg transition-all active:scale-[0.99]">
-                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Entrar"}
-                  </Button>
-                </div>
-              </form>
-
-              <div className="mt-8 pt-5 border-t border-[#F3F4F6]">
-                <p className="text-center text-[11px] text-[#D1D5DB]">
-                  MOBYOU Mobilidade Elétrica — Todos os direitos reservados
-                </p>
               </div>
-            </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="senha">Senha</Label>
+                <div className="relative">
+                  <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-primary" />
+                  <Input
+                    id="senha"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    autoComplete="current-password"
+                    placeholder="Digite sua senha"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="h-12 pl-11 pr-11"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="lembrar"
+                    checked={lembrar}
+                    onCheckedChange={(c) => setLembrar(c === true)}
+                  />
+                  <Label htmlFor="lembrar" className="text-sm font-normal">
+                    Lembrar meu e-mail
+                  </Label>
+                </div>
+                <Link
+                  href="/recuperar-senha"
+                  className="text-sm font-medium text-primary hover:underline"
+                >
+                  Esqueci minha senha
+                </Link>
+              </div>
+
+              <Button type="submit" disabled={loading} className="h-12 w-full text-base font-semibold">
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Entrar
+              </Button>
+            </form>
           </div>
+
+          <p className="mt-6 text-center text-sm text-muted-foreground">
+            Não tem uma conta?{" "}
+            <a
+              href={WHATSAPP_ADMIN}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-primary hover:underline"
+            >
+              Fale com o administrador
+            </a>
+          </p>
         </div>
-      </div>
-    </>
+      </main>
+    </div>
   );
 }

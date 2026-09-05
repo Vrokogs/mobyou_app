@@ -133,3 +133,18 @@
     font-family: var(--font-heading), var(--font-sans), system-ui, sans-serif;
   }
 }
+/* Painel de apresentação do login.
+   A foto é opcional: as camadas vão da frente para o fundo, então o véu escuro
+   cobre a foto (para o texto ler), e o degradê de pôr do sol fica ATRÁS dela.
+   Se /images/login-hero.jpg não existir, aquela camada é ignorada e o degradê
+   assume sozinho — a tela nunca fica quebrada esperando um arquivo. */
+.login-hero {
+  background-color: #0d0d10;
+  background-image:
+    linear-gradient(105deg, rgba(10, 10, 12, 0.93) 0%, rgba(10, 10, 12, 0.74) 48%, rgba(10, 10, 12, 0.52) 100%),
+    url("/images/login-hero.jpg"),
+    radial-gradient(125% 95% at 76% 84%, #F26B1D 0%, #b8410a 20%, #5b2a12 44%, #17171b 74%);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}

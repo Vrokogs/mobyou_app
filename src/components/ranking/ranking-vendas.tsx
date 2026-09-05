@@ -13,13 +13,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Trophy, Medal, TrendingUp, Store, Bike, Building2, Users, Target,
-  ArrowUp, ArrowDown,
+  Trophy, Medal, TrendingUp, Bike, Users, Target, ArrowUp, ArrowDown,
 } from "lucide-react";
-import { BarChart } from "@/components/ui/bar-chart";
 import { Podio } from "@/components/ranking/podio";
 import { iniciais } from "@/lib/avatar";
-import { UNIDADES_VENDA, VENDEDORES_ATACADO } from "@/lib/constants";
+import { UNIDADES_VENDA } from "@/lib/constants";
 
 interface Venda {
   id: string;
@@ -125,7 +123,6 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
 
   const vendasVarejo = doPeriodo.filter((v) => (v.unidade_negocio ?? "varejo") !== "atacado");
   const varejoAnterior = doAnterior.filter((v) => (v.unidade_negocio ?? "varejo") !== "atacado");
-  const vendasAtacado = doPeriodo.filter((v) => v.unidade_negocio === "atacado");
 
   const ativos = vendedores.filter((v) => v.ativo);
 
@@ -152,10 +149,6 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
   });
   porVendedor.sort((a, b) => b.total - a.total || b.qtd - a.qtd);
 
-  const totalAtacado = vendasAtacado.reduce((s, v) => s + (v.valor_total ?? 0), 0);
-  const qtdAtacado = vendasAtacado.length;
-  const duplaAtacado = vendedores.filter((v) => VENDEDORES_ATACADO.includes((v.email || "").toLowerCase()));
-
   const totalGeral = doPeriodo.reduce((s, v) => s + (v.valor_total ?? 0), 0);
   const qtdGeral = doPeriodo.length;
   const venderam = porVendedor.filter((v) => v.qtd > 0).length;
@@ -172,7 +165,6 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
     return {
       unidade: u,
       qtd: vu.length,
-      total: vu.reduce((s, v) => s + (v.valor_total ?? 0), 0),
       progresso: Math.min(100, (vu.length / metaLoja) * 100),
     };
   });
@@ -409,55 +401,6 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
         </CardContent>
       </Card>
 
-      {/* Atacado — dividido 50/50 */}
-      <Card className="border-purple-200 bg-purple-50/30">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Building2 className="h-4 w-4 text-purple-600" /> Atacado — Julia &amp; Robert (50/50)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-xs text-muted-foreground">Total do atacado no período</p>
-              {podeVerFaturamento && <p className="text-2xl font-bold text-purple-700">{brl(totalAtacado)}</p>}
-              <p className="text-xs text-muted-foreground">{qtdAtacado} venda(s) de atacado</p>
-            </div>
-            <p className="max-w-xs text-xs text-muted-foreground">
-              As vendas de atacado são somadas e divididas igualmente entre Julia e
-              Robert, independentemente de quem lançou cada uma.
-            </p>
-          </div>
-          {podeVerFaturamento && (
-            <div className="grid grid-cols-2 gap-3">
-              {(duplaAtacado.length ? duplaAtacado : [{ id: "j", nome: "Julia" }, { id: "r", nome: "Robert" }]).map((v) => (
-                <div key={v.id} className="rounded-lg border bg-white p-3 text-center">
-                  <p className="text-sm font-medium">{v.nome}</p>
-                  <p className="mt-1 text-xl font-bold text-purple-700">{brl(totalAtacado / 2)}</p>
-                  <p className="text-[11px] text-muted-foreground">50% do atacado</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Faturamento por loja */}
-      {podeVerFaturamento && (
-        <BarChart
-          titulo="Faturamento das unidades"
-          icon={Store}
-          descricao={`Quanto cada loja vendeu em ${periodoLabel}.`}
-          cor="#0E9F6E"
-          formatar={brl}
-          itens={porUnidade.map((u) => ({
-            id: u.unidade,
-            rotulo: u.unidade,
-            valor: u.total,
-            detalhe: `${u.qtd} moto${u.qtd === 1 ? "" : "s"}`,
-          }))}
-        />
-      )}
     </div>
   );
 }

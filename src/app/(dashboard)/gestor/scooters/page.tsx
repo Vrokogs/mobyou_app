@@ -54,11 +54,25 @@ interface ScooterWithOwner extends Scooter {
   garantia_status?: GarantiaStatus | null;
 }
 
+// O modelo vem solto da nota fiscal, então a mesma moto aparece escrita de
+// várias formas: "Mobyou X13" e "X13", "Vegas" e "Mobyou Vegas", "Mob Tri" e
+// "MobTri". Para as abas, o que só difere pelo prefixo da marca, por espaço ou
+// por caixa conta como um modelo só. Grafias realmente diferentes ("X11 MINI" e
+// "X11 MINI 1000W") continuam separadas — podem ser motos diferentes e não cabe
+// ao filtro decidir isso.
+function chaveModelo(modelo: string | null): string {
+  return (modelo ?? "")
+    .toLowerCase()
+    .replace(/^mobyou\b/, "")
+    .replace(/\s+/g, "");
+}
+
 export default function ScootersPage() {
   const [scooters, setScooters] = useState<ScooterWithOwner[]>([]);
   const [clientes, setClientes] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [modeloFiltro, setModeloFiltro] = useState("todos");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -145,6 +159,36 @@ export default function ScootersPage() {
     setSaving(false);
     loadScooters();
   }
+
+  // Uma aba por modelo que realmente tem moto cadastrada, da maior frota para a
+  // menor. O rótulo é a grafia mais usada do grupo, para a aba mostrar o nome
+  // como ele aparece na lista.
+  const modelosDisponiveis = (() => {
+    const grupos = new Map<string, { qtd: number; grafias: Record<string, number> }>();
+    for (const s of scooters) {
+      const chave = chaveModelo(s.modelo);
+      if (!chave) continue;
+      const g = grupos.get(chave) ?? { qtd: 0, grafias: {} };
+      g.qtd += 1;
+      const nome = s.modelo ?? "";
+      g.grafias[nome] = (g.grafias[nome] ?? 0) + 1;
+      grupos.set(chave, g);
+    }
+    return [...grupos.entries()]
+      .map(([chave, g]) => ({
+        chave,
+        qtd: g.qtd,
+        rotulo: Object.entries(g.grafias).sort((a, b) => b[1] - a[1])[0][0],
+      }))
+      .sort((a, b) => b.qtd - a.qtd || a.rotulo.localeCompare(b.rotulo));
+  })();
+
+  const scootersFiltradas =
+    modeloFiltro === "todos"
+      ? scooters
+      : scooters.filter((s) => chaveModelo(s.modelo) === modeloFiltro);
+
+  const rotuloAtivo = modelosDisponiveis.find((m) => m.chave === modeloFiltro)?.rotulo;
 
   function getGarantiaLabel(status: GarantiaStatus | null | undefined) {
     if (!status) return { label: "Sem garantia", className: "bg-gray-100 text-gray-600" };
@@ -324,17 +368,57 @@ export default function ScootersPage() {
         />
       </div>
 
+      {/* Abas por modelo. Rolam na horizontal porque a frota tem mais de vinte
+          grafias e a barra não caberia numa linha só. */}
+      {modelosDisponiveis.length > 0 && (
+        <div className="-mx-1 overflow-x-auto pb-1">
+          <div className="flex items-center gap-1.5 px-1 w-max">
+            <Button
+              variant={modeloFiltro === "todos" ? "default" : "outline"}
+              size="sm"
+              className="rounded-full"
+              onClick={() => setModeloFiltro("todos")}
+            >
+              Todos
+              <Badge variant="secondary" className="ml-1.5 bg-black/10 text-inherit">
+                {scooters.length}
+              </Badge>
+            </Button>
+            {modelosDisponiveis.map((m) => (
+              <Button
+                key={m.chave}
+                variant={modeloFiltro === m.chave ? "default" : "outline"}
+                size="sm"
+                className="rounded-full"
+                onClick={() => setModeloFiltro(m.chave)}
+              >
+                {m.rotulo}
+                <Badge variant="secondary" className="ml-1.5 bg-black/10 text-inherit">
+                  {m.qtd}
+                </Badge>
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Bike className="h-5 w-5" />
             Lista de Scooters
+            <span className="text-sm font-normal text-muted-foreground">
+              — {scootersFiltradas.length}
+              {rotuloAtivo ? ` ${rotuloAtivo}` : " no total"}
+            </span>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {scooters.length === 0 ? (
+          {scootersFiltradas.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
-              Nenhuma scooter encontrada.
+              {scooters.length === 0
+                ? "Nenhuma scooter encontrada."
+                : `Nenhuma scooter do modelo ${rotuloAtivo ?? ""} nesta busca.`}
             </p>
           ) : (
             <Table>
@@ -351,7 +435,7 @@ export default function ScootersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {scooters.map((scooter) => {
+                {scootersFiltradas.map((scooter) => {
                   const garantia = getGarantiaLabel(scooter.garantia_status);
                   return (
                     <TableRow key={scooter.id}>

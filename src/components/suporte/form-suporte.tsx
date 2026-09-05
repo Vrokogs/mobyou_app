@@ -69,10 +69,7 @@ export function FormSuporte({ open, onOpenChange, nomePadrao, emailPadrao }: For
             <LifeBuoy className="h-5 w-5 text-primary" />
             Falar com o administrador
           </DialogTitle>
-          <DialogDescription>
-            Conte o que você precisa. A mensagem cai direto na caixa de quem cuida
-            do sistema, com o contato que você deixar aqui.
-          </DialogDescription>
+          <DialogDescription>Fale conosco!</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={enviar} className="space-y-4">
@@ -124,9 +121,6 @@ export function FormSuporte({ open, onOpenChange, nomePadrao, emailPadrao }: For
               />
             </div>
           </div>
-          <p className="-mt-1 text-[11px] text-muted-foreground">
-            Deixe pelo menos um dos dois — é por onde a resposta volta.
-          </p>
 
           <div className="space-y-1.5">
             <Label htmlFor="sup-msg">Mensagem</Label>

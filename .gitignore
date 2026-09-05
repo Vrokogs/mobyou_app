@@ -49,3 +49,6 @@ next-env.d.ts
 
 # Original da logo (2,9 MB). As versões otimizadas estão em public/images e mobyou-site/img.
 logo_mb_novo.png
+
+# Composicao original da capa (2,1 MB). O recorte usado esta em public/images/login-hero.jpg.
+foto_capa_layout.png

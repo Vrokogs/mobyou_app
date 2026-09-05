@@ -134,17 +134,21 @@
   }
 }
 /* Painel de apresentação do login.
-   A foto é opcional: as camadas vão da frente para o fundo, então o véu escuro
-   cobre a foto (para o texto ler), e o degradê de pôr do sol fica ATRÁS dela.
-   Se /images/login-hero.jpg não existir, aquela camada é ignorada e o degradê
-   assume sozinho — a tela nunca fica quebrada esperando um arquivo. */
+   As camadas vão da frente para o fundo: véu escuro, foto, degradê de reserva.
+   O véu é forte só até ~42%, onde fica o texto, e cai rápido depois — assim a
+   logo e a frase leem sobre preto e a moto e o pôr do sol continuam visíveis.
+   As paradas foram ajustadas simulando o recorte real do painel, não no olho.
+   Se /images/login-hero.jpg sumir, aquela camada é ignorada e o degradê assume
+   sozinho: a tela nunca fica quebrada esperando um arquivo. */
 .login-hero {
   background-color: #0d0d10;
   background-image:
-    linear-gradient(105deg, rgba(10, 10, 12, 0.93) 0%, rgba(10, 10, 12, 0.74) 48%, rgba(10, 10, 12, 0.52) 100%),
+    linear-gradient(90deg, rgba(9, 9, 11, 0.9) 0%, rgba(9, 9, 11, 0.78) 42%, rgba(9, 9, 11, 0.34) 68%, rgba(9, 9, 11, 0.1) 100%),
     url("/images/login-hero.jpg"),
     radial-gradient(125% 95% at 76% 84%, #F26B1D 0%, #b8410a 20%, #5b2a12 44%, #17171b 74%);
   background-size: cover;
-  background-position: center;
+  /* Puxado para a direita: o texto fica na faixa escura da esquerda e a moto
+     sobra na parte clara, sem uma coisa por cima da outra. */
+  background-position: 72% center;
   background-repeat: no-repeat;
 }

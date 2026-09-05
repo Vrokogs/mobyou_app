@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
 import type { Profile, Role } from "@/types/database";
+import { AvatarEditavel } from "@/components/usuarios/avatar-editavel";
 
 interface UserFormData {
   nome: string;
@@ -188,6 +189,7 @@ export default function UsuariosPage() {
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-14">Foto</TableHead>
             <TableHead>Nome</TableHead>
             <TableHead>E-mail</TableHead>
             <TableHead>Telefone</TableHead>
@@ -198,6 +200,14 @@ export default function UsuariosPage() {
         <TableBody>
           {users.map((user) => (
             <TableRow key={user.id}>
+              <TableCell>
+                <AvatarEditavel
+                  userId={user.id}
+                  nome={user.nome}
+                  avatarUrl={user.avatar_url}
+                  onChange={() => loadUsers()}
+                />
+              </TableCell>
               <TableCell className="font-medium">{user.nome}</TableCell>
               <TableCell>{user.email}</TableCell>
               <TableCell>{user.telefone ?? "---"}</TableCell>

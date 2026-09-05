@@ -14,7 +14,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { iniciais } from "@/lib/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   LayoutDashboard, Users, Bike, ClipboardList, FileText, Wrench,
@@ -160,23 +161,17 @@ interface AppSidebarProps {
   userRole: string;
   userName: string;
   userEmail: string;
+  avatarUrl?: string | null;
   onLogout: () => void;
 }
 
-export function AppSidebar({ userRole, userName, userEmail, onLogout }: AppSidebarProps) {
+export function AppSidebar({ userRole, userName, userEmail, avatarUrl, onLogout }: AppSidebarProps) {
   const pathname = usePathname();
   let navigation = navByRole[userRole] || [];
   // Vendedor habilitado à manutenção ganha o grupo de OS.
   if (userRole === "vendedor" && podeManutencao(userEmail)) {
     navigation = [...navigation, oficinaGroup];
   }
-
-  const initials = userName
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
 
   return (
     <Sidebar>
@@ -214,6 +209,9 @@ export function AppSidebar({ userRole, userName, userEmail, onLogout }: AppSideb
                       <SidebarMenuButton
                         render={<Link href={item.href} />}
                         isActive={isActive}
+                        // Ativo vira pílula laranja cheia; o hover continua
+                        // sendo o cinza discreto do tema.
+                        className="rounded-lg data-active:bg-sidebar-primary data-active:font-semibold data-active:text-sidebar-primary-foreground data-active:hover:bg-sidebar-primary data-active:hover:text-sidebar-primary-foreground"
                       >
                         <item.icon className="h-4 w-4" />
                         <span>{item.title}</span>
@@ -235,8 +233,9 @@ export function AppSidebar({ userRole, userName, userEmail, onLogout }: AppSideb
                 render={<SidebarMenuButton className="h-auto py-2" />}
               >
                 <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-[#D4731A] text-white text-xs font-bold">
-                    {initials}
+                  {avatarUrl && <AvatarImage src={avatarUrl} alt={userName} />}
+                  <AvatarFallback className="bg-primary text-primary-foreground text-xs font-bold">
+                    {iniciais(userName)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 text-left">

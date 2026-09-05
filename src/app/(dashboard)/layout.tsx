@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
-import { Separator } from "@/components/ui/separator";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
+import { Topbar } from "@/components/layout/topbar";
 import { createClient } from "@/lib/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -13,6 +13,7 @@ interface UserProfile {
   nome: string;
   email: string;
   role: string;
+  avatar_url: string | null;
 }
 
 export default function DashboardLayout({
@@ -36,7 +37,7 @@ export default function DashboardLayout({
 
       const { data } = await supabase
         .from("profiles")
-        .select("id, nome, email, role")
+        .select("id, nome, email, role, avatar_url")
         .eq("id", user.id)
         .single();
 
@@ -75,14 +76,19 @@ export default function DashboardLayout({
         userRole={profile.role}
         userName={profile.nome}
         userEmail={profile.email}
+        avatarUrl={profile.avatar_url}
         onLogout={handleLogout}
       />
       <SidebarInset>
-        <header className="flex h-14 items-center gap-2 border-b border-[#d5d9e0] px-4 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 sticky top-0 z-10">
-          <SidebarTrigger className="text-[#0A1628]" />
-          <Separator orientation="vertical" className="h-6" />
-        </header>
-        <main className="flex-1 p-4 sm:p-6 bg-[#f0f2f5] min-h-[calc(100vh-3.5rem)]">
+        <Topbar
+          userId={profile.id}
+          userName={profile.nome}
+          userRole={profile.role}
+          avatarUrl={profile.avatar_url}
+          onAvatarChange={(url) => setProfile((p) => (p ? { ...p, avatar_url: url } : p))}
+          onLogout={handleLogout}
+        />
+        <main className="flex-1 bg-muted/40 p-4 sm:p-6 min-h-[calc(100vh-4rem)]">
           {children}
         </main>
       </SidebarInset>

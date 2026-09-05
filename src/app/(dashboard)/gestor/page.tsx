@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatCard } from "@/components/ui/stat-card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS } from "@/lib/constants";
 import type { OrdemServicoStatus } from "@/types/database";
@@ -21,15 +22,23 @@ import {
   Radar,
   MapPin,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-interface StatCard {
+// Legenda de cada card: diz o que o número conta, no lugar da variação
+// percentual que existia antes com valores fixos inventados no código.
+const LEGENDA: Record<string, string> = {
+  "Agendamentos Hoje": "agendamentos",
+  "OS em Andamento": "ordens",
+  "Orçamentos Pendentes": "orçamentos",
+  "Clientes Ativos": "clientes",
+};
+
+interface Indicador {
   title: string;
   value: number;
-  icon: React.ReactNode;
-  trend: number;
-  trendLabel: string;
+  icon: LucideIcon;
 }
 
 interface RecentOrder {
@@ -57,7 +66,7 @@ interface VendaLite {
 
 export default function GestorDashboardPage() {
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<StatCard[]>([]);
+  const [stats, setStats] = useState<Indicador[]>([]);
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [vendasLite, setVendasLite] = useState<VendaLite[]>([]);
@@ -114,34 +123,10 @@ export default function GestorDashboardPage() {
       setLeadsOrigem((leadsRes.data ?? []) as { origem: string | null }[]);
 
       setStats([
-        {
-          title: "Agendamentos Hoje",
-          value: agendamentosRes.count ?? 0,
-          icon: <CalendarCheck className="h-5 w-5 text-blue-600" />,
-          trend: 12,
-          trendLabel: "vs ontem",
-        },
-        {
-          title: "OS em Andamento",
-          value: osAndamentoRes.count ?? 0,
-          icon: <Wrench className="h-5 w-5 text-amber-600" />,
-          trend: -3,
-          trendLabel: "vs semana",
-        },
-        {
-          title: "Orcamentos Pendentes",
-          value: orcamentosRes.count ?? 0,
-          icon: <FileText className="h-5 w-5 text-orange-600" />,
-          trend: 5,
-          trendLabel: "vs semana",
-        },
-        {
-          title: "Clientes Ativos",
-          value: clientesRes.count ?? 0,
-          icon: <Users className="h-5 w-5 text-green-600" />,
-          trend: 8,
-          trendLabel: "vs mes",
-        },
+        { title: "Agendamentos Hoje", value: agendamentosRes.count ?? 0, icon: CalendarCheck },
+        { title: "OS em Andamento", value: osAndamentoRes.count ?? 0, icon: Wrench },
+        { title: "Orçamentos Pendentes", value: orcamentosRes.count ?? 0, icon: FileText },
+        { title: "Clientes Ativos", value: clientesRes.count ?? 0, icon: Users },
       ]);
 
       setRecentOrders(
@@ -231,19 +216,13 @@ export default function GestorDashboardPage() {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
-          <Card key={stat.title} className="hover:ring-2 hover:ring-primary/20 transition-all">
-            <CardContent className="pt-2">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm text-muted-foreground font-medium">
-                  {stat.title}
-                </span>
-                <div className="rounded-lg bg-muted p-2">{stat.icon}</div>
-              </div>
-              <div className="flex items-end justify-between">
-                <span className="text-3xl font-bold">{stat.value}</span>
-              </div>
-            </CardContent>
-          </Card>
+          <StatCard
+            key={stat.title}
+            titulo={stat.title}
+            valor={stat.value}
+            icon={stat.icon}
+            legenda={LEGENDA[stat.title]}
+          />
         ))}
       </div>
 

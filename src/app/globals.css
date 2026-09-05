@@ -73,13 +73,15 @@
   --chart-4: #1a3a5c;
   --chart-5: #f59e0b;
   --radius: 0.625rem;
-  --sidebar: #0A1628;
-  --sidebar-foreground: #e8eaef;
+  /* Sidebar em carvão, não azul-marinho: o laranja da marca fica mais forte
+     sobre neutro do que sobre azul, que competia com ele. */
+  --sidebar: #101014;
+  --sidebar-foreground: #d8d9dd;
   --sidebar-primary: #D4731A;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #122240;
-  --sidebar-accent-foreground: #f0f2f5;
-  --sidebar-border: #1a3050;
+  --sidebar-accent: #1c1c22;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #26262e;
   --sidebar-ring: #D4731A;
 }
 

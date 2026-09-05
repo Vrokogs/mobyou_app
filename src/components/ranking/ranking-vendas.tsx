@@ -165,10 +165,6 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
   const mediaPorVendedor = venderam > 0
     ? porVendedor.reduce((s, v) => s + v.total, 0) / venderam
     : 0;
-  const totalAnterior = doAnterior.reduce((s, v) => s + (v.valor_total ?? 0), 0);
-  const evolucaoGeral = totalAnterior > 0
-    ? ((totalGeral - totalAnterior) / totalAnterior) * 100
-    : null;
 
   // Meta: motos vendidas por loja no mês. A da empresa é a soma das lojas.
   const porUnidade = UNIDADES_VENDA.map((u) => {
@@ -262,9 +258,7 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
               </p>
               <p className="mt-1 text-2xl font-bold text-emerald-400">{brl(mediaPorVendedor)}</p>
               <p className="mt-0.5 text-xs text-white/50">
-                {evolucaoGeral === null
-                  ? `entre os ${venderam} que venderam`
-                  : `${evolucaoGeral >= 0 ? "+" : ""}${evolucaoGeral.toFixed(0)}% no total vs. período anterior`}
+                entre os {venderam} que venderam
               </p>
             </div>
           )}

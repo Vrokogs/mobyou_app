@@ -42,7 +42,10 @@ export function Podio({ colocados, formatar, mostrarValor = true }: PodioProps) 
             key={c.id}
             className={cn(
               "flex flex-col items-center justify-end rounded-2xl border p-4 text-center transition-transform",
-              "border-white/10 bg-gradient-to-b to-transparent",
+              // O fundo preto vai por baixo do degradê colorido: sozinho, o
+              // degradê é transparente demais e o brilho da foto atrás
+              // atravessava, comendo o contraste do nome e do valor.
+              "border-white/10 bg-black/40 bg-gradient-to-b to-transparent backdrop-blur-sm",
               d.base,
               d.altura,
               d.ordem,

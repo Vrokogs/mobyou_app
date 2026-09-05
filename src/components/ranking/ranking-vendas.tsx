@@ -13,9 +13,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Trophy, Medal, TrendingUp, Bike, Users, Target, ArrowUp, ArrowDown,
+  Trophy, Medal, TrendingUp, Bike, Users, Target,
 } from "lucide-react";
 import { Podio } from "@/components/ranking/podio";
+import { Brasas } from "@/components/ranking/brasas";
 import { iniciais } from "@/lib/avatar";
 import { UNIDADES_VENDA } from "@/lib/constants";
 
@@ -114,15 +115,7 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
 
   const doPeriodo = vendas.filter((v) => noPeriodo(v, ano, mes));
 
-  // Período anterior, base da coluna de evolução: num mês fechado é o mês antes
-  // dele; no ano inteiro, o ano anterior.
-  const ant = mes === -1
-    ? { ano: ano - 1, mes: -1 }
-    : { ano: mes === 0 ? ano - 1 : ano, mes: mes === 0 ? 11 : mes - 1 };
-  const doAnterior = vendas.filter((v) => noPeriodo(v, ant.ano, ant.mes));
-
   const vendasVarejo = doPeriodo.filter((v) => (v.unidade_negocio ?? "varejo") !== "atacado");
-  const varejoAnterior = doAnterior.filter((v) => (v.unidade_negocio ?? "varejo") !== "atacado");
 
   const ativos = vendedores.filter((v) => v.ativo);
 
@@ -131,9 +124,6 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
   const porVendedor = ativos.map((vd) => {
     const suas = vendasVarejo.filter((v) => v.vendedor_id === vd.id);
     const total = suas.reduce((s, v) => s + (v.valor_total ?? 0), 0);
-    const antes = varejoAnterior
-      .filter((v) => v.vendedor_id === vd.id)
-      .reduce((s, v) => s + (v.valor_total ?? 0), 0);
     return {
       id: vd.id,
       nome: vd.nome,
@@ -142,9 +132,6 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
       total,
       // Quanto vale, em média, cada moto que ele vendeu.
       ticket: suas.length > 0 ? total / suas.length : 0,
-      // Sem venda no período anterior não há base de comparação — fica nulo,
-      // em vez de virar um "+100%" que não quer dizer nada.
-      evolucao: antes > 0 ? ((total - antes) / antes) * 100 : null,
     };
   });
   porVendedor.sort((a, b) => b.total - a.total || b.qtd - a.qtd);
@@ -202,8 +189,10 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
     <div className="space-y-6">
       {/* Vitrine do ranking. Fundo escuro para as fotos e o pódio ganharem
           destaque — é a tela que a equipe abre para se comparar. */}
-      <div className="rank-hero overflow-hidden rounded-2xl p-5 text-white sm:p-7">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="rank-hero relative overflow-hidden rounded-2xl p-5 text-white sm:p-7">
+        <Brasas />
+
+        <div className="relative flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight sm:text-3xl">
               <Trophy className="h-7 w-7 text-amber-400" /> Ranking de Vendas
@@ -230,9 +219,9 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
           </Select>
         </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="relative mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {podeVerFaturamento && (
-            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+            <div className="rounded-xl border border-white/10 bg-black/45 p-4 backdrop-blur-sm">
               <p className="flex items-center gap-1.5 text-xs text-white/60">
                 <TrendingUp className="h-3.5 w-3.5 text-amber-400" /> Total vendido no período
               </p>
@@ -244,7 +233,7 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
           )}
 
           {podeVerFaturamento && (
-            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+            <div className="rounded-xl border border-white/10 bg-black/45 p-4 backdrop-blur-sm">
               <p className="flex items-center gap-1.5 text-xs text-white/60">
                 <Users className="h-3.5 w-3.5 text-emerald-400" /> Média por vendedor
               </p>
@@ -256,7 +245,7 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
           )}
 
           {/* Meta em MOTOS, não em reais: são 13 por loja no mês. */}
-          <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+          <div className="rounded-xl border border-white/10 bg-black/45 p-4 backdrop-blur-sm">
             <p className="flex items-center gap-1.5 text-xs text-white/60">
               <Target className="h-3.5 w-3.5 text-violet-400" /> Meta do mês
             </p>
@@ -272,7 +261,7 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
           </div>
 
           {!podeVerFaturamento && (
-            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+            <div className="rounded-xl border border-white/10 bg-black/45 p-4 backdrop-blur-sm">
               <p className="flex items-center gap-1.5 text-xs text-white/60">
                 <Bike className="h-3.5 w-3.5 text-amber-400" /> Vendedores que venderam
               </p>
@@ -284,11 +273,11 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
         </div>
 
         {noPodio.length > 0 ? (
-          <div className="mt-8">
+          <div className="relative mt-8">
             <Podio colocados={noPodio} formatar={brl} mostrarValor={podeVerFaturamento} />
           </div>
         ) : (
-          <p className="mt-7 rounded-xl border border-white/10 bg-white/[0.04] p-6 text-center text-sm text-white/50">
+          <p className="relative mt-7 rounded-xl border border-white/10 bg-black/40 p-6 text-center text-sm text-white/50">
             Nenhuma venda registrada em {periodoLabel}.
           </p>
         )}
@@ -313,7 +302,6 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
                   {podeVerFaturamento && <TableHead>Vendas</TableHead>}
                   <TableHead>Motos</TableHead>
                   {podeVerFaturamento && <TableHead>Ticket médio</TableHead>}
-                  <TableHead>Evolução</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -347,25 +335,11 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
                         {v.qtd > 0 ? brl(v.ticket) : "---"}
                       </TableCell>
                     )}
-                    <TableCell>
-                      {v.evolucao === null ? (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      ) : (
-                        <span className={`flex items-center gap-1 text-xs font-medium ${v.evolucao >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
-                          {v.evolucao >= 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
-                          {v.evolucao >= 0 ? "+" : ""}{v.evolucao.toFixed(0)}%
-                        </span>
-                      )}
-                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           )}
-          <p className="mt-3 text-[11px] text-muted-foreground">
-            A evolução compara com o período anterior. Quem não vendeu antes fica com
-            &quot;—&quot;: sem base, não há percentual possível.
-          </p>
         </CardContent>
       </Card>
 

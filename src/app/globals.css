@@ -158,7 +158,47 @@
    telas parecerem do mesmo sistema. */
 .rank-hero {
   background-color: #101014;
+  /* Camadas da frente para o fundo: véu leve, foto, degradê de reserva.
+     O véu é fraco de propósito — a foto já nasce escura, e o 55% que testei
+     primeiro apagava a moto e as brasas. 28% só garante o contraste do texto
+     branco sobre o brilho do canto inferior esquerdo. */
   background-image:
-    radial-gradient(90% 120% at 88% -10%, rgba(242, 107, 29, 0.28) 0%, rgba(242, 107, 29, 0.08) 38%, transparent 68%),
+    linear-gradient(rgba(10, 10, 12, 0.28), rgba(10, 10, 12, 0.28)),
+    url("/images/ranking-hero.jpg"),
     linear-gradient(160deg, #17171c 0%, #101014 55%, #0b0b0e 100%);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* Brasas caindo. Enfeite puro: fica atrás do conteúdo e não recebe clique.
+   Quem pede menos animação no sistema não vê nada disso. */
+.brasas {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.brasa {
+  position: absolute;
+  top: -6%;
+  border-radius: 9999px;
+  background: radial-gradient(circle, #ffd9a8 0%, #f97316 45%, rgba(249, 115, 22, 0) 72%);
+  opacity: 0;
+  animation-name: brasa-cai;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@keyframes brasa-cai {
+  0%   { transform: translate3d(0, 0, 0);              opacity: 0; }
+  12%  {                                                opacity: 0.9; }
+  50%  { transform: translate3d(14px, 52vh, 0); }
+  85%  {                                                opacity: 0.55; }
+  100% { transform: translate3d(-10px, 108vh, 0);       opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brasas { display: none; }
 }

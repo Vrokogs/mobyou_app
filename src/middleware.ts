@@ -8,6 +8,7 @@ const ROLE_ROUTES: Record<Role, string> = {
   vendedor: '/vendedor',
   tecnico: '/tecnico',
   cliente: '/cliente',
+  dev: '/dev',
 };
 
 const PROTECTED_PREFIXES: { prefix: string; role: Role }[] = [
@@ -15,6 +16,7 @@ const PROTECTED_PREFIXES: { prefix: string; role: Role }[] = [
   { prefix: '/vendedor', role: 'vendedor' },
   { prefix: '/tecnico', role: 'tecnico' },
   { prefix: '/cliente', role: 'cliente' },
+  { prefix: '/dev', role: 'dev' },
 ];
 
 const PUBLIC_ROUTES = ['/login', '/registro', '/recuperar-senha', '/primeiro-acesso', '/reset-password', '/auth/callback'];

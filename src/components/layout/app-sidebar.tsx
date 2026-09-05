@@ -21,7 +21,7 @@ import {
   LayoutDashboard, Users, Bike, ClipboardList, FileText, Wrench,
   Package, ShieldCheck, Award, Upload, DollarSign, Settings,
   LogOut, ChevronUp, UserCog, Hash, ShoppingCart,
-  Clock, Trophy, Radar, CalendarClock, Boxes, BarChart3, Bell,
+  Clock, Trophy, Radar, CalendarClock, Boxes, BarChart3, Bell, LifeBuoy,
 } from "lucide-react";
 import { podeManutencao } from "@/lib/constants";
 
@@ -137,8 +137,19 @@ const clienteNav: NavGroup[] = [
   },
 ];
 
+// Conta de quem cuida do sistema: só a caixa de suporte, nada de operação.
+const devNav: NavGroup[] = [
+  {
+    label: "Suporte",
+    items: [
+      { title: "Caixa de suporte", href: "/dev", icon: LifeBuoy },
+    ],
+  },
+];
+
 const navByRole: Record<string, NavGroup[]> = {
   gestor: gestorNav,
+  dev: devNav,
   vendedor: vendedorNav,
   tecnico: tecnicoNav,
   cliente: clienteNav,

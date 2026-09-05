@@ -1,4 +1,23 @@
-export type Role = 'gestor' | 'vendedor' | 'tecnico' | 'cliente';
+// 'dev' é a conta de quem cuida do sistema: vê só a caixa de suporte.
+export type Role = 'gestor' | 'vendedor' | 'tecnico' | 'cliente' | 'dev';
+
+export type SuporteTipo = 'senha' | 'acesso' | 'erro' | 'sugestao' | 'outro';
+export type SuporteStatus = 'aberto' | 'em_andamento' | 'resolvido';
+
+export type SolicitacaoSuporte = {
+  id: string;
+  tipo: SuporteTipo;
+  nome: string;
+  email: string | null;
+  telefone: string | null;
+  mensagem: string;
+  status: SuporteStatus;
+  anotacao: string | null;
+  autor_id: string | null;
+  resolvido_por: string | null;
+  resolvido_em: string | null;
+  created_at: string;
+};
 
 export type GarantiaStatus = 'ativa' | 'expirada' | 'cancelada';
 
@@ -348,6 +367,17 @@ export type VendaPeca = {
 export type VendaPecaInsert = Omit<VendaPeca, 'id' | 'created_at'> & { id?: string; created_at?: string };
 export type VendaPecaUpdate = Partial<VendaPecaInsert>;
 
+export type SolicitacaoSuporteInsert =
+  Omit<SolicitacaoSuporte, 'id' | 'created_at' | 'status' | 'anotacao' | 'resolvido_por' | 'resolvido_em'> & {
+    id?: string;
+    created_at?: string;
+    status?: SuporteStatus;
+    anotacao?: string | null;
+    resolvido_por?: string | null;
+    resolvido_em?: string | null;
+  };
+export type SolicitacaoSuporteUpdate = Partial<SolicitacaoSuporteInsert>;
+
 export type EstoqueMoto = {
   id: string;
   unidade: string;
@@ -631,6 +661,7 @@ export type Database = {
       montagens: TableDefinition<Montagem, MontagemInsert, MontagemUpdate>;
       manutencoes_preventivas: TableDefinition<ManutencaoPreventiva, ManutencaoPreventivaInsert, ManutencaoPreventivaUpdate>;
       vendas_pecas: TableDefinition<VendaPeca, VendaPecaInsert, VendaPecaUpdate>;
+      solicitacoes_suporte: TableDefinition<SolicitacaoSuporte, SolicitacaoSuporteInsert, SolicitacaoSuporteUpdate>;
     };
     Views: { [_ in never]: never };
     Functions: { [_ in never]: never };

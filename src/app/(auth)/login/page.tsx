@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
+import { FormSuporte } from "@/components/suporte/form-suporte";
 import { toast } from "sonner";
 import {
   Loader2, Eye, EyeOff, Mail, Lock, BarChart3, Zap, ShieldCheck, Headphones,
@@ -18,6 +19,7 @@ const ROTAS: Record<string, string> = {
   vendedor: "/vendedor",
   tecnico: "/tecnico",
   cliente: "/cliente",
+  dev: "/dev",
 };
 
 const DESTAQUES = [
@@ -47,14 +49,13 @@ const DESTAQUES = [
 // A senha nunca é gravada.
 const CHAVE_EMAIL = "mobyou:ultimo-email";
 
-const WHATSAPP_ADMIN = "https://wa.me/5511974234265";
-
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [lembrar, setLembrar] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [suporteAberto, setSuporteAberto] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -241,17 +242,24 @@ export default function LoginPage() {
             </form>
           </div>
 
+          {/* Antes ia para o WhatsApp: o pedido saía do sistema e não ficava
+              registro. Agora abre o formulário e o chamado cai na caixa do dev. */}
           <p className="mt-6 text-center text-sm text-muted-foreground">
-            Não tem uma conta?{" "}
-            <a
-              href={WHATSAPP_ADMIN}
-              target="_blank"
-              rel="noopener noreferrer"
+            Não tem uma conta ou precisa de ajuda?{" "}
+            <button
+              type="button"
+              onClick={() => setSuporteAberto(true)}
               className="font-medium text-primary hover:underline"
             >
               Fale com o administrador
-            </a>
+            </button>
           </p>
+
+          <FormSuporte
+            open={suporteAberto}
+            onOpenChange={setSuporteAberto}
+            emailPadrao={email}
+          />
         </div>
       </main>
     </div>

@@ -538,3 +538,28 @@ export const MONTAGEM_STATUS: Record<string, string> = {
   em_montagem: 'Em montagem',
   concluida: 'Concluída',
 };
+
+// Caixa de suporte: o que chega pela tela de login e pelo painel.
+export const SUPORTE_TIPOS = [
+  { value: 'senha', label: 'Esqueci a senha / não consigo entrar' },
+  { value: 'acesso', label: 'Preciso de acesso ao sistema' },
+  { value: 'erro', label: 'Encontrei um erro' },
+  { value: 'sugestao', label: 'Sugestão ou melhoria' },
+  { value: 'outro', label: 'Outro assunto' },
+] as const;
+
+export const SUPORTE_TIPO_LABEL: Record<string, string> =
+  Object.fromEntries(SUPORTE_TIPOS.map((t) => [t.value, t.label]));
+
+export const SUPORTE_STATUS_LABEL: Record<string, string> = {
+  aberto: 'Aberto',
+  em_andamento: 'Em andamento',
+  resolvido: 'Resolvido',
+};
+
+// Tom das pills, no mesmo vocabulário do resto do sistema.
+export const SUPORTE_STATUS_TOM: Record<string, TomStatus> = {
+  aberto: 'espera',
+  em_andamento: 'andamento',
+  resolvido: 'sucesso',
+};

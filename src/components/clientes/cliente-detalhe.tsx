@@ -80,11 +80,11 @@ interface NotaFiscalCliente {
   } | null;
 }
 
+// Sem e-mail: ele é a credencial de login e muda só pelo botão Acesso.
 interface EditFormData {
   nome: string;
   cpf: string;
   telefone: string;
-  email: string;
   endereco: string;
 }
 
@@ -186,7 +186,6 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
         nome: c.nome,
         cpf: c.cpf ?? "",
         telefone: c.telefone ?? "",
-        email: c.email,
         endereco: c.endereco ?? "",
       });
     }
@@ -234,13 +233,14 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
   async function onEditSubmit(formData: EditFormData) {
     setSaving(true);
     const supabase = createClient();
+    // O e-mail não entra aqui de propósito: ele é a credencial de login e só
+    // muda pelo botão Acesso, que atualiza cadastro e autenticação juntos.
     const { error } = await supabase
       .from("profiles")
       .update({
         nome: formData.nome,
         cpf: formData.cpf || null,
         telefone: formData.telefone || null,
-        email: formData.email,
         endereco: formData.endereco || null,
       })
       .eq("id", clienteId);
@@ -694,10 +694,6 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
                     </DialogDescription>
                   </DialogHeader>
                   <form onSubmit={handleSubmit(onEditSubmit)} className="space-y-4">
-                    <p className="text-[11px] text-muted-foreground bg-muted/50 rounded-md p-2">
-                      Alterar o e-mail aqui muda o cadastro, não o login do cliente.
-                      Para trocar o acesso, use o botão <strong>Acesso</strong> (gestor).
-                    </p>
                     <div className="space-y-2">
                       <Label htmlFor="edit-nome">Nome</Label>
                       <Input id="edit-nome" {...register("nome", { required: "Nome obrigatorio" })} />
@@ -711,10 +707,18 @@ export function ClienteDetalhe({ basePath }: ClienteDetalheProps) {
                       <Label htmlFor="edit-telefone">Telefone</Label>
                       <Input id="edit-telefone" {...register("telefone")} />
                     </div>
+                    {/* O e-mail é o login do cliente. Editá-lo aqui só mudava o
+                        cadastro e deixava o acesso no e-mail antigo — o cliente
+                        via um e-mail na tela e entrava com outro. Trocar é pelo
+                        botão Acesso, que muda os dois de uma vez. */}
                     <div className="space-y-2">
-                      <Label htmlFor="edit-email">E-mail</Label>
-                      <Input id="edit-email" type="email" {...register("email", { required: "E-mail obrigatorio" })} />
-                      {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+                      <Label>E-mail (login do cliente)</Label>
+                      <Input value={cliente.email ?? ""} readOnly disabled />
+                      <p className="text-[11px] text-muted-foreground">
+                        É com este e-mail que o cliente entra no painel. Para trocar,
+                        use o botão <strong>Acesso</strong> (gestor) — ele altera o
+                        cadastro e o login juntos.
+                      </p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="edit-endereco">Endereco</Label>

@@ -18,7 +18,6 @@ import {
 import { Podio } from "@/components/ranking/podio";
 import { Brasas } from "@/components/ranking/brasas";
 import { iniciais } from "@/lib/avatar";
-import { UNIDADES_VENDA } from "@/lib/constants";
 
 interface Venda {
   id: string;
@@ -56,7 +55,7 @@ interface RankingVendasProps {
 export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
   const [vendas, setVendas] = useState<Venda[]>([]);
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
-  const [metaLoja, setMetaLoja] = useState(META_MOTOS_PADRAO);
+  const [metaVendedor, setMetaVendedor] = useState(META_MOTOS_PADRAO);
   const [loading, setLoading] = useState(true);
   const [atualizadoEm, setAtualizadoEm] = useState<Date | null>(null);
   const now = new Date();
@@ -71,13 +70,14 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
     const [vRes, pRes, cRes] = await Promise.all([
       supabase.from("vendas").select("*, vendedor:profiles!vendedor_id(nome)").order("created_at", { ascending: false }),
       supabase.from("profiles").select("id, nome, email, ativo, avatar_url").eq("role", "vendedor").order("nome"),
-      supabase.from("empresa_config").select("meta_motos_loja").limit(1).maybeSingle(),
+      supabase.from("empresa_config").select("meta_motos_vendedor").limit(1).maybeSingle(),
     ]);
     setVendas((vRes.data ?? []) as unknown as Venda[]);
     setVendedores((pRes.data ?? []) as unknown as Vendedor[]);
-    // A coluna só existe depois da migration 037; até lá vale o padrão.
-    const cfg = cRes.data as { meta_motos_loja?: number | null } | null;
-    setMetaLoja(cfg?.meta_motos_loja ?? META_MOTOS_PADRAO);
+    // A coluna só existe depois da migration 038; até lá vale o padrão, que é
+    // o mesmo valor — a consulta falha e cai no fallback sem quebrar a tela.
+    const cfg = cRes.data as { meta_motos_vendedor?: number | null } | null;
+    setMetaVendedor(cfg?.meta_motos_vendedor ?? META_MOTOS_PADRAO);
     setAtualizadoEm(new Date());
     setLoading(false);
   }, []);
@@ -146,17 +146,14 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
     ? porVendedor.reduce((s, v) => s + v.total, 0) / venderam
     : 0;
 
-  // Meta: motos vendidas por loja no mês. A da empresa é a soma das lojas.
-  const porUnidade = UNIDADES_VENDA.map((u) => {
-    const vu = doPeriodo.filter((v) => v.unidade === u);
-    return {
-      unidade: u,
-      qtd: vu.length,
-      progresso: Math.min(100, (vu.length / metaLoja) * 100),
-    };
-  });
-  const metaEmpresa = metaLoja * UNIDADES_VENDA.length;
-  const progressoEmpresa = Math.min(100, (qtdGeral / metaEmpresa) * 100);
+  // Meta: 13 motos por vendedor no mês. A da empresa é 13 x quantos vendedores
+  // ativos existem, e o progresso é a soma do que eles venderam — assim o card
+  // grande é exatamente a soma das barras individuais, sem número solto.
+  const metaEmpresa = metaVendedor * ativos.length;
+  const motosDaEquipe = porVendedor.reduce((s, v) => s + v.qtd, 0);
+  const progressoEmpresa = metaEmpresa > 0
+    ? Math.min(100, (motosDaEquipe / metaEmpresa) * 100)
+    : 0;
 
   // Opções: os últimos 12 meses e o fechamento de cada ano com venda.
   const opcoes: { value: string; label: string }[] = [];
@@ -244,19 +241,19 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
             </div>
           )}
 
-          {/* Meta em MOTOS, não em reais: são 13 por loja no mês. */}
+          {/* Meta em MOTOS, não em reais: 13 por vendedor no mês. */}
           <div className="rounded-xl border border-white/10 bg-black/45 p-4 backdrop-blur-sm">
             <p className="flex items-center gap-1.5 text-xs text-white/60">
               <Target className="h-3.5 w-3.5 text-violet-400" /> Meta do mês
             </p>
             <p className="mt-1 text-2xl font-bold text-violet-300">
-              {qtdGeral}<span className="text-base font-normal text-white/50"> / {metaEmpresa} motos</span>
+              {motosDaEquipe}<span className="text-base font-normal text-white/50"> / {metaEmpresa} motos</span>
             </p>
             <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
               <div className="h-full rounded-r bg-violet-400 transition-[width] duration-500" style={{ width: `${progressoEmpresa}%` }} />
             </div>
             <p className="mt-1 text-xs text-white/50">
-              {progressoEmpresa.toFixed(0)}% concluída · {metaLoja} por loja
+              {progressoEmpresa.toFixed(0)}% concluída · {metaVendedor} por vendedor
             </p>
           </div>
 
@@ -343,35 +340,54 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
         </CardContent>
       </Card>
 
-      {/* Meta por loja */}
+      {/* Meta por vendedor */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
-            <Target className="h-4 w-4 text-muted-foreground" /> Meta por loja — {metaLoja} motos no mês
+            <Target className="h-4 w-4 text-muted-foreground" /> Meta por vendedor — {metaVendedor} motos no mês
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {porUnidade.map((u) => (
-            <div key={u.unidade} className="space-y-1.5">
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-medium">{u.unidade}</span>
-                <span className="text-muted-foreground">
-                  <span className="font-semibold text-foreground tabular-nums">{u.qtd}</span> / {metaLoja} motos
-                  {u.qtd >= metaLoja && (
-                    <Badge variant="secondary" className="ml-2 bg-emerald-100 text-[10px] text-emerald-700">
-                      meta batida
-                    </Badge>
-                  )}
-                </span>
+          {porVendedor.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Nenhum vendedor cadastrado.
+            </p>
+          ) : porVendedor.map((v) => {
+            const bateu = v.qtd >= metaVendedor;
+            return (
+              <div key={v.id} className="space-y-1.5">
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <Avatar className="h-6 w-6 shrink-0">
+                      {v.avatarUrl && <AvatarImage src={v.avatarUrl} alt={v.nome} />}
+                      <AvatarFallback className="bg-muted text-[9px] font-semibold">
+                        {iniciais(v.nome)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="truncate font-medium">{v.nome}</span>
+                  </span>
+                  <span className="whitespace-nowrap text-muted-foreground">
+                    <span className="font-semibold text-foreground tabular-nums">{v.qtd}</span> / {metaVendedor} motos
+                    {bateu && (
+                      <Badge variant="secondary" className="ml-2 bg-emerald-100 text-[10px] text-emerald-700">
+                        meta batida
+                      </Badge>
+                    )}
+                  </span>
+                </div>
+                <div className="h-2.5 w-full overflow-hidden rounded-sm bg-muted">
+                  <div
+                    className={`h-full rounded-r transition-[width] duration-500 ${bateu ? "bg-emerald-500" : "bg-primary"}`}
+                    style={{ width: `${Math.min(100, (v.qtd / metaVendedor) * 100)}%` }}
+                  />
+                </div>
               </div>
-              <div className="h-2.5 w-full overflow-hidden rounded-sm bg-muted">
-                <div
-                  className={`h-full rounded-r transition-[width] duration-500 ${u.qtd >= metaLoja ? "bg-emerald-500" : "bg-primary"}`}
-                  style={{ width: `${u.progresso}%` }}
-                />
-              </div>
-            </div>
-          ))}
+            );
+          })}
+          <p className="text-[11px] text-muted-foreground">
+            Conta as vendas de varejo, as mesmas do ranking. As de atacado são
+            divididas entre dois vendedores e não entram na meta individual.
+          </p>
         </CardContent>
       </Card>
 

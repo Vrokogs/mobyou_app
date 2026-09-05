@@ -96,7 +96,7 @@ export default function LoginPage() {
           <div className="flex justify-center mb-8 fade-up">
             <div className="float-logo">
               <img
-                src="/images/logo-mobyou.jpg"
+                src="/images/logo-mobyou.png"
                 alt="MOBYOU"
                 className="w-28 h-28 object-contain rounded-2xl shadow-[0_0_50px_rgba(201,107,29,0.2)]"
               />

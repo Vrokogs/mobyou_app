@@ -9,6 +9,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Trophy, Medal, TrendingUp, Store, Bike, Building2 } from "lucide-react";
+import { BarChart } from "@/components/ui/bar-chart";
 import { UNIDADES_VENDA, VENDEDORES_ATACADO } from "@/lib/constants";
 
 interface Venda {
@@ -86,7 +87,6 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
   const qtdAtacado = vendasAtacado.length;
   const duplaAtacado = vendedores.filter((v) => VENDEDORES_ATACADO.includes((v.email || "").toLowerCase()));
 
-  const maxTotal = Math.max(1, ...porVendedor.map((v) => v.total));
   // Faturamento e volume do período: todas as vendas, inclusive de quem saiu da
   // equipe e do atacado. Não depende de quem aparece no ranking.
   const totalGeral = doPeriodo.reduce((s, v) => s + (v.valor_total ?? 0), 0);
@@ -98,7 +98,6 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
     const vu = doPeriodo.filter((v) => v.unidade === u);
     return { unidade: u, qtd: vu.length, total: vu.reduce((s, v) => s + (v.valor_total ?? 0), 0) };
   });
-  const maxUnidade = Math.max(1, ...porUnidade.map((u) => u.total));
 
   // Opções: os últimos 12 meses (mais recente primeiro) e o fechamento de cada
   // ano com venda registrada. Permite comparar 3, 6 ou 12 meses para trás.
@@ -196,53 +195,41 @@ export function RankingVendas({ podeVerFaturamento }: RankingVendasProps) {
         </CardContent>
       </Card>
 
-      {/* Ranking do VAREJO — gráfico de barras */}
-      <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2"><Medal className="h-4 w-4" /> Ranking de vendedores — Varejo</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
-          {porVendedor.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">Nenhum vendedor cadastrado.</p>
-          ) : porVendedor.map((v, i) => (
-            <div key={v.id} className="space-y-1">
-              <div className="flex items-center justify-between text-sm">
-                <span className="flex items-center gap-2 font-medium">
-                  {i < 3
-                    ? <Trophy className={`h-4 w-4 ${medalha[i]}`} />
-                    : <span className="w-4 text-center text-xs text-muted-foreground">{i + 1}</span>}
-                  {v.nome}
-                  {v.qtd === 0 && <Badge variant="secondary" className="bg-gray-100 text-gray-600 text-[10px]">sem vendas</Badge>}
-                </span>
-                <span className="text-muted-foreground">{v.qtd} moto(s) • <span className="font-semibold text-foreground">{brl(v.total)}</span></span>
-              </div>
-              <div className="h-3 w-full rounded-full bg-muted overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all ${i === 0 ? "bg-yellow-400" : i === 1 ? "bg-gray-400" : i === 2 ? "bg-amber-600" : "bg-primary/60"}`}
-                  style={{ width: `${Math.max(v.total > 0 ? 4 : 0, (v.total / maxTotal) * 100)}%` }}
-                />
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+      {/* Ranking do VAREJO */}
+      <BarChart
+        titulo="Ranking de vendedores — Varejo"
+        icon={Medal}
+        descricao={`Por valor vendido em ${periodoLabel}. A quantidade de motos aparece ao lado do valor.`}
+        vazio="Nenhum vendedor cadastrado."
+        formatar={brl}
+        itens={porVendedor.map((v, i) => ({
+          id: v.id,
+          rotulo: v.nome,
+          valor: v.total,
+          detalhe: `${v.qtd} moto${v.qtd === 1 ? "" : "s"}`,
+          prefixo: i < 3
+            ? <Trophy className={`h-4 w-4 shrink-0 ${medalha[i]}`} />
+            : <span className="w-4 shrink-0 text-center text-xs text-muted-foreground">{i + 1}</span>,
+          selo: v.qtd === 0
+            ? <Badge variant="secondary" className="bg-gray-100 text-[10px] text-gray-600">sem vendas</Badge>
+            : undefined,
+        }))}
+      />
 
       {/* Visão geral por unidade */}
-      <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2"><Store className="h-4 w-4" /> Visão geral das unidades</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
-          {porUnidade.map((u) => (
-            <div key={u.unidade} className="space-y-1">
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-medium">{u.unidade}</span>
-                <span className="text-muted-foreground">{u.qtd} moto(s) • <span className="font-semibold text-foreground">{brl(u.total)}</span></span>
-              </div>
-              <div className="h-3 w-full rounded-full bg-muted overflow-hidden">
-                <div className="h-full rounded-full bg-emerald-500 transition-all"
-                  style={{ width: `${Math.max(u.total > 0 ? 4 : 0, (u.total / maxUnidade) * 100)}%` }} />
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+      <BarChart
+        titulo="Visão geral das unidades"
+        icon={Store}
+        descricao={`Faturamento de cada loja em ${periodoLabel}.`}
+        cor="#0E9F6E"
+        formatar={brl}
+        itens={porUnidade.map((u) => ({
+          id: u.unidade,
+          rotulo: u.unidade,
+          valor: u.total,
+          detalhe: `${u.qtd} moto${u.qtd === 1 ? "" : "s"}`,
+        }))}
+      />
     </div>
   );
 }
